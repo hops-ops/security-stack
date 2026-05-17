@@ -1,0 +1,93 @@
+# code: language=yaml
+#
+# Helm Release: falco
+#
+# Chart:    https://falcosecurity.github.io/charts (chart name: falco)
+# Upstream: https://github.com/falcosecurity/charts/tree/master/charts/falco
+#
+# Defaults:
+#   - driver.kind: modern_ebpf — required from Falco 0.43; legacy 'ebpf' is
+#     deprecated. XRD enum forbids 'ebpf'.
+#   - falcosidekick: disabled. Output routing (Loki / OTel) is its own
+#     iteration (tasks/security-stack-otel-collector-output).
+#   - resources: 256m / 512Mi request, 1Gi memory limit. Research surfaced
+#     >8GB on busy GKE nodes — sized for the colima/pat-local baseline; raise
+#     via spec.falco.values.resources for large clusters.
+#   - tolerations: ambient-style wildcard NoSchedule/NoExecute, matching the
+#     ztunnel/istio-cni precedent in the cluster (see
+#     reference_istio_ambient_daemonset_tolerations memory).
+#
+
+{{- $fl := $state.falco }}
+{{- if $fl.enabled }}
+---
+apiVersion: helm.m.crossplane.io/v1beta1
+kind: Release
+metadata:
+  name: {{ $fl.releaseName }}
+  annotations:
+    {{ setResourceNameAnnotation "falco" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  forProvider:
+    chart:
+      name: falco
+      repository: https://falcosecurity.github.io/charts
+      version: {{ $fl.chartVersion | quote }}
+    namespace: {{ $fl.namespace }}
+    # wait: false — Falco is a cluster-wide DaemonSet. With wait=true the release
+    # gates on ALL DS pods Ready, which is unsatisfiable on clusters where any
+    # node is at its per-node pod limit (EKS VPC CNI ENI-based pod cap, observed
+    # on pat-local). DaemonSet rolling status is the right readiness signal, not
+    # helm's all-pods-Ready wait. Setting wait at install time will block forever.
+    wait: false
+    {{- if gt (len $fl.overrideAllValues) 0 }}
+    values:
+      {{- toYaml $fl.overrideAllValues | nindent 6 }}
+    {{- else }}
+    values:
+      driver:
+        kind: {{ $fl.driver }}
+      collectors:
+        kubernetes:
+          # K8s metadata enricher pinned CPU at 1000m on large clusters per
+          # research (Falco issue #2346). Keep ON for first pass; tune off for
+          # >100-node clusters via spec.falco.values.collectors.kubernetes.enabled.
+          enabled: true
+      tty: false
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+        limits:
+          cpu: 1000m
+          memory: 1Gi
+      # Run on every node, mirroring the ambient DaemonSet (ztunnel / istio-cni)
+      # tolerations pattern. Don't miss events on tainted node pools.
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+        - effect: NoExecute
+          operator: Exists
+      falcosidekick:
+        # Off until output routing iteration lands. Enabling it without an
+        # output destination is noise.
+        enabled: false
+      serviceMonitor:
+        # Off until ObserveStack integration lands.
+        enabled: false
+      falco:
+        json_output: true
+        json_include_output_property: true
+        # Buffer pressure (scap_n_drops_total) is the key SLI per research;
+        # increase ring_buffer_size if drops appear under load.
+      {{- if gt (len $fl.values) 0 }}
+      {{- toYaml $fl.values | nindent 6 }}
+      {{- end }}
+    {{- end }}
+  rollbackLimit: 3
+  providerConfigRef:
+    name: {{ $state.helmProviderConfigRef.name }}
+    kind: {{ $state.helmProviderConfigRef.kind }}
+{{- end }}

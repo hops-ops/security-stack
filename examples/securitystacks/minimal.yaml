@@ -1,0 +1,7 @@
+apiVersion: hops.ops.com.ai/v1alpha1
+kind: SecurityStack
+metadata:
+  name: security
+  namespace: default
+spec:
+  clusterName: default

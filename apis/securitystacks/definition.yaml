@@ -1,0 +1,139 @@
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: securitystacks.hops.ops.com.ai
+spec:
+  group: hops.ops.com.ai
+  names:
+    kind: SecurityStack
+    plural: securitystacks
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    referenceable: true
+    served: true
+    schema:
+      openAPIV3Schema:
+        description: SecurityStack installs Trivy Operator (image / IaC / k8s-config / RBAC / exposed-secret scanning) and Falco (eBPF runtime threat detection) on a target Kubernetes cluster as two Helm releases. Cloud-neutral. Engine-only in this iteration — supply-chain ClusterPolicies, scan-result enforcement, Falcosidekick output routing, and ObserveStack integration ship in subsequent iterations.
+        type: object
+        properties:
+          spec:
+            description: SecurityStackSpec defines the desired state.
+            type: object
+            properties:
+              clusterName:
+                description: Name of the target cluster. Used as default for helmProviderConfigRef.name, kubernetesProviderConfigRef.name, and resource naming.
+                type: string
+              managementPolicies:
+                description: Management policies for all composed resources. Defaults to ["*"].
+                type: array
+                items:
+                  type: string
+                default:
+                - "*"
+              labels:
+                description: Custom labels applied to all managed resources. Merged with the stack defaults (hops.ops.com.ai/managed=true, hops.ops.com.ai/securitystack=<name>).
+                type: object
+                additionalProperties:
+                  type: string
+                x-kubernetes-preserve-unknown-fields: true
+              helmProviderConfigRef:
+                description: Reference to the Helm ProviderConfig. Defaults to clusterName.
+                type: object
+                properties:
+                  name:
+                    type: string
+                  kind:
+                    type: string
+                    enum:
+                    - ProviderConfig
+                    - ClusterProviderConfig
+              kubernetesProviderConfigRef:
+                description: Reference to the Kubernetes ProviderConfig (used to compose the trivy and falco namespaces). Defaults to clusterName.
+                type: object
+                properties:
+                  name:
+                    type: string
+                  kind:
+                    type: string
+                    enum:
+                    - ProviderConfig
+                    - ClusterProviderConfig
+              trivy:
+                description: Trivy Operator configuration.
+                type: object
+                properties:
+                  enabled:
+                    description: Whether to install Trivy Operator. Defaults to true.
+                    type: boolean
+                    default: true
+                  namespace:
+                    description: Namespace for the Trivy Operator Helm release. Defaults to "trivy-system".
+                    type: string
+                  releaseName:
+                    description: Helm release name. Defaults to "trivy-operator".
+                    type: string
+                  chartVersion:
+                    description: Trivy Operator Helm chart version. Default 0.30.0 (app v0.29.x). NOTE — supply-chain hardening (image digest pinning, cosign-verify-the-scanner) deferred to tasks/security-stack-trivy-supply-chain-hardening per CVE-2026-33634 research finding.
+                    type: string
+                  values:
+                    description: Helm values merged on top of the stack's defaults.
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                  overrideAllValues:
+                    description: Helm values that replace all defaults entirely.
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+              falco:
+                description: Falco runtime threat detection configuration.
+                type: object
+                properties:
+                  enabled:
+                    description: Whether to install Falco. Defaults to true.
+                    type: boolean
+                    default: true
+                  namespace:
+                    description: Namespace for the Falco Helm release. Defaults to "falco".
+                    type: string
+                  releaseName:
+                    description: Helm release name. Defaults to "falco".
+                    type: string
+                  chartVersion:
+                    description: Falco Helm chart version. Default 6.2.0 (app v0.43.x — first release where modern_ebpf is the required default).
+                    type: string
+                  driver:
+                    description: 'Falco kernel driver. Defaults to "modern_ebpf". Legacy "ebpf" deprecated in Falco 0.43 — explicitly disallowed by enum. "kmod" only as documented fallback for kernels < 5.8.'
+                    type: string
+                    enum:
+                    - modern_ebpf
+                    - kmod
+                    default: modern_ebpf
+                  values:
+                    description: Helm values merged on top of the stack's defaults.
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                  overrideAllValues:
+                    description: Helm values that replace all defaults entirely.
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+            required:
+            - clusterName
+          status:
+            description: SecurityStackStatus defines the observed state.
+            type: object
+            properties:
+              ready:
+                description: Overall readiness — true when all enabled components are Ready.
+                type: boolean
+              trivy:
+                type: object
+                properties:
+                  ready:
+                    type: boolean
+              falco:
+                type: object
+                properties:
+                  ready:
+                    type: boolean
+        required:
+        - spec

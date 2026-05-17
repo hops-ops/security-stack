@@ -1,0 +1,95 @@
+# code: language=yaml
+#
+# Initialize $state with spec defaults
+#
+
+{{- $xr := getCompositeResource . }}
+{{- $spec := $xr.spec | default dict }}
+{{- $metadata := $xr.metadata | default dict }}
+
+# ==============================================================================
+# Core defaults
+# ==============================================================================
+{{- $name := $metadata.name | default "security" }}
+{{- $clusterName := $spec.clusterName | default $name }}
+{{- $managementPolicies := $spec.managementPolicies | default (list "*") }}
+
+# Labels — every composed resource carries hops.ops.com.ai/managed=true and a
+# kind-scoped marker. User-provided labels merge on top.
+{{- $kindKey := printf "hops.ops.com.ai/%s" (lower $xr.kind) }}
+{{- $defaultLabels := dict
+  "hops.ops.com.ai/managed" "true"
+  $kindKey $name
+}}
+{{- $labels := mergeOverwrite (dict) $defaultLabels ($spec.labels | default dict) }}
+
+# ==============================================================================
+# Provider config refs (both default to clusterName)
+# ==============================================================================
+{{- $helmPCR := $spec.helmProviderConfigRef | default dict }}
+{{- $helmPCR = dict
+  "name" ($helmPCR.name | default $clusterName)
+  "kind" ($helmPCR.kind | default "ProviderConfig")
+}}
+
+{{- $k8sPCR := $spec.kubernetesProviderConfigRef | default dict }}
+{{- $k8sPCR = dict
+  "name" ($k8sPCR.name | default $clusterName)
+  "kind" ($k8sPCR.kind | default "ProviderConfig")
+}}
+
+# ==============================================================================
+# Trivy Operator component
+# ==============================================================================
+{{- $tv := $spec.trivy | default dict }}
+{{- $tvEnabled := true }}
+{{- if hasKey $tv "enabled" }}
+  {{- $tvEnabled = $tv.enabled }}
+{{- end }}
+{{- $tvNamespace := $tv.namespace | default "trivy-system" }}
+{{- $tvReleaseName := $tv.releaseName | default "trivy-operator" }}
+{{- $tvChartVersion := $tv.chartVersion | default "0.30.0" }}
+
+# ==============================================================================
+# Falco component
+# ==============================================================================
+{{- $fl := $spec.falco | default dict }}
+{{- $flEnabled := true }}
+{{- if hasKey $fl "enabled" }}
+  {{- $flEnabled = $fl.enabled }}
+{{- end }}
+{{- $flNamespace := $fl.namespace | default "falco" }}
+{{- $flReleaseName := $fl.releaseName | default "falco" }}
+{{- $flChartVersion := $fl.chartVersion | default "6.2.0" }}
+{{- $flDriver := $fl.driver | default "modern_ebpf" }}
+
+# ==============================================================================
+# Initialize $state
+# ==============================================================================
+{{- $state := dict
+  "name" $name
+  "clusterName" $clusterName
+  "managementPolicies" $managementPolicies
+  "labels" $labels
+  "helmProviderConfigRef" $helmPCR
+  "kubernetesProviderConfigRef" $k8sPCR
+  "trivy" (dict
+    "enabled" $tvEnabled
+    "namespace" $tvNamespace
+    "releaseName" $tvReleaseName
+    "chartVersion" $tvChartVersion
+    "values" ($tv.values | default dict)
+    "overrideAllValues" ($tv.overrideAllValues | default dict)
+  )
+  "falco" (dict
+    "enabled" $flEnabled
+    "namespace" $flNamespace
+    "releaseName" $flReleaseName
+    "chartVersion" $flChartVersion
+    "driver" $flDriver
+    "values" ($fl.values | default dict)
+    "overrideAllValues" ($fl.overrideAllValues | default dict)
+  )
+  "observed" (dict)
+  "status" (dict)
+}}

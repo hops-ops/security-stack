@@ -1,0 +1,45 @@
+# code: language=yaml
+#
+# Extract observed-resource readiness for each composed Helm Release.
+# Overall status.ready is left false here — function-auto-ready computes it
+# from all composed resources.
+#
+
+{{- $observed := $.observed.resources | default dict }}
+
+{{- $checkReady := dict }}
+{{- range $key := list "trivy" "falco" "namespace-trivy" "namespace-falco" }}
+  {{- $entry := get $observed $key | default dict }}
+  {{- $resource := $entry.resource | default dict }}
+  {{- $status := $resource.status | default dict }}
+  {{- $ready := false }}
+  {{- range ($status.conditions | default list) }}
+    {{- if and (eq .type "Ready") (eq .status "True") }}
+      {{- $ready = true }}
+    {{- end }}
+  {{- end }}
+  {{- $checkReady = set $checkReady $key $ready }}
+{{- end }}
+
+{{- $state = set $state "observed" (dict
+  "trivy" (dict "ready" (get $checkReady "trivy"))
+  "falco" (dict "ready" (get $checkReady "falco"))
+  "namespaceTrivy" (dict "ready" (get $checkReady "namespace-trivy"))
+  "namespaceFalco" (dict "ready" (get $checkReady "namespace-falco"))
+) }}
+
+# Overall ready: every enabled component must be Ready. Mirrors the typed
+# Ready condition that function-auto-ready computes from composed resources.
+{{- $overallReady := true }}
+{{- if $state.trivy.enabled }}
+  {{- if not (get $checkReady "trivy") }}{{- $overallReady = false }}{{- end }}
+{{- end }}
+{{- if $state.falco.enabled }}
+  {{- if not (get $checkReady "falco") }}{{- $overallReady = false }}{{- end }}
+{{- end }}
+
+{{- $state = set $state "status" (dict
+  "ready" $overallReady
+  "trivy" (dict "ready" (get $checkReady "trivy"))
+  "falco" (dict "ready" (get $checkReady "falco"))
+) }}

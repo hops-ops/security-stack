@@ -1,0 +1,15 @@
+apiVersion: hops.ops.com.ai/v1alpha1
+kind: SecurityStack
+metadata:
+  name: security
+  namespace: pat-local
+spec:
+  clusterName: pat-local
+  labels:
+    team: platform
+    environment: dev
+  trivy:
+    namespace: trivy-system
+  falco:
+    namespace: falco
+    driver: modern_ebpf

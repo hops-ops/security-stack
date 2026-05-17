@@ -1,0 +1,65 @@
+# code: language=yaml
+#
+# Helm Release: trivy-operator
+#
+# Chart:    https://aquasecurity.github.io/helm-charts/ (chart name: trivy-operator)
+# Upstream: https://github.com/aquasecurity/trivy-operator
+#
+# First-pass scope: install the operator with sensible scan targets. Supply-chain
+# hardening (image digest pinning, OCI-install, cosign-verify-the-scanner per
+# CVE-2026-33634) lives in tasks/security-stack-trivy-supply-chain-hardening.
+#
+# Note: Trivy Operator publishes its own CRDs (VulnerabilityReport,
+# ConfigAuditReport, RbacAssessmentReport, ExposedSecretReport, SbomReport, ...).
+# Scan-result enforcement Kyverno policies that read those CRs land in a
+# separate iteration (tasks/security-stack-scanresultpolicies-controller-pattern).
+#
+
+{{- $tv := $state.trivy }}
+{{- if $tv.enabled }}
+---
+apiVersion: helm.m.crossplane.io/v1beta1
+kind: Release
+metadata:
+  name: {{ $tv.releaseName }}
+  annotations:
+    {{ setResourceNameAnnotation "trivy" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  forProvider:
+    chart:
+      name: trivy-operator
+      repository: https://aquasecurity.github.io/helm-charts/
+      version: {{ $tv.chartVersion | quote }}
+    namespace: {{ $tv.namespace }}
+    wait: true
+    {{- if gt (len $tv.overrideAllValues) 0 }}
+    values:
+      {{- toYaml $tv.overrideAllValues | nindent 6 }}
+    {{- else }}
+    values:
+      trivy:
+        # Scan targets — image vulns + workload config + RBAC posture + secrets.
+        # Cluster-compliance (CIS / NSA) is left off here; Kubescape covers that
+        # surface and is tracked at tasks/security-stack-kubescape-promote-v1.
+        ignoreUnfixed: false
+      operator:
+        scanJobsConcurrentLimit: 10
+        # Default 24h interval is fine for first pass; tune downward for higher
+        # signal cadence once ObserveStack alerts are wired.
+        vulnerabilityScannerScanOnlyCurrentRevisions: true
+        configAuditScannerScanOnlyCurrentRevisions: true
+      serviceMonitor:
+        # Off until ObserveStack integration lands
+        # (tasks/security-stack-observe-integration).
+        enabled: false
+      {{- if gt (len $tv.values) 0 }}
+      {{- toYaml $tv.values | nindent 6 }}
+      {{- end }}
+    {{- end }}
+  rollbackLimit: 3
+  providerConfigRef:
+    name: {{ $state.helmProviderConfigRef.name }}
+    kind: {{ $state.helmProviderConfigRef.kind }}
+{{- end }}

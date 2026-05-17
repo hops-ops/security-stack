@@ -1,0 +1,62 @@
+# code: language=yaml
+#
+# Ensure namespaces exist for Trivy Operator + Falco releases.
+#
+# The Helm provider can implicitly create release namespaces, but composing
+# them as Object MRs gives us explicit ownership, labels propagation, and a
+# stable readiness signal we can gate on.
+#
+
+{{- $k8sPCR := $state.kubernetesProviderConfigRef }}
+
+# ==============================================================================
+# Namespace: trivy
+# ==============================================================================
+{{- if $state.trivy.enabled }}
+---
+apiVersion: kubernetes.m.crossplane.io/v1alpha1
+kind: Object
+metadata:
+  name: {{ $state.name }}-namespace-trivy
+  annotations:
+    {{ setResourceNameAnnotation "namespace-trivy" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  forProvider:
+    manifest:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ $state.trivy.namespace }}
+        labels: {{ $state.labels | toJson }}
+  providerConfigRef:
+    name: {{ $k8sPCR.name }}
+    kind: {{ $k8sPCR.kind }}
+{{- end }}
+
+# ==============================================================================
+# Namespace: falco (only if distinct from trivy's)
+# ==============================================================================
+{{- if and $state.falco.enabled (or (not $state.trivy.enabled) (ne $state.falco.namespace $state.trivy.namespace)) }}
+---
+apiVersion: kubernetes.m.crossplane.io/v1alpha1
+kind: Object
+metadata:
+  name: {{ $state.name }}-namespace-falco
+  annotations:
+    {{ setResourceNameAnnotation "namespace-falco" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  forProvider:
+    manifest:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ $state.falco.namespace }}
+        labels: {{ $state.labels | toJson }}
+  providerConfigRef:
+    name: {{ $k8sPCR.name }}
+    kind: {{ $k8sPCR.kind }}
+{{- end }}
