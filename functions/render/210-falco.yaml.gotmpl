@@ -95,9 +95,13 @@ spec:
         enabled: {{ $state.observe.enabled }}
         {{- if $state.observe.enabled }}
         config:
+          # Direct Loki output — Falcosidekick 2.31 does NOT expose an OTLP
+          # logs endpoint (only traces + metrics). Pipe-through-Alloy for
+          # enrichment/fan-out is a future iteration.
+          loki:
+            hostport: "{{ $state.observe.lokiEndpoint }}"
+            format: json
           otlp:
-            logs:
-              endpoint: "{{ $state.observe.alloyReceiverEndpoint }}/v1/logs"
             traces:
               endpoint: "{{ $state.observe.alloyReceiverEndpoint }}/v1/traces"
         serviceMonitor:

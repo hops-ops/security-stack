@@ -524,9 +524,12 @@ _items = [
                         falcosidekick = {
                             enabled = True
                             serviceMonitor.enabled = True
-                            config.otlp = {
-                                logs.endpoint = "http://alloy-receiver.monitoring.svc.cluster.local:4318/v1/logs"
-                                traces.endpoint = "http://alloy-receiver.monitoring.svc.cluster.local:4318/v1/traces"
+                            config = {
+                                loki = {
+                                    hostport = "http://loki-gateway.monitoring.svc.cluster.local"
+                                    format = "json"
+                                }
+                                otlp.traces.endpoint = "http://alloy-receiver.monitoring.svc.cluster.local:4318/v1/traces"
                             }
                         }
                     }
@@ -610,10 +613,7 @@ _items = [
                     apiVersion = "helm.m.crossplane.io/v1beta1"
                     kind = "Release"
                     metadata.name = "falco"
-                    spec.forProvider.values.falcosidekick.config.otlp = {
-                        logs.endpoint = "http://otel-collector.observe.svc:4318/v1/logs"
-                        traces.endpoint = "http://otel-collector.observe.svc:4318/v1/traces"
-                    }
+                    spec.forProvider.values.falcosidekick.config.otlp.traces.endpoint = "http://otel-collector.observe.svc:4318/v1/traces"
                 }
             ]
         }

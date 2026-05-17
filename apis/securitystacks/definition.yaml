@@ -176,7 +176,10 @@ spec:
                     type: boolean
                     default: true
                   alloyReceiverEndpoint:
-                    description: OTLP HTTP endpoint of the ObserveStack Alloy receiver. Defaults to "http://alloy-receiver.monitoring.svc.cluster.local:4318" (the conventional Hops ObserveStack location). Override for non-standard observe-stack namespace or remote-collector setups.
+                    description: OTLP HTTP endpoint of the ObserveStack Alloy receiver. Defaults to "http://alloy-receiver.monitoring.svc.cluster.local:4318" (the conventional Hops ObserveStack location). Used for OTLP traces (Tempo correlation, syscall source only). Override for non-standard observe-stack namespace or remote-collector setups.
+                    type: string
+                  lokiEndpoint:
+                    description: Loki push endpoint (full URL incl. host + scheme). Defaults to "http://loki-gateway.monitoring.svc.cluster.local". Falcosidekick uses its native Loki output for event logs (chart does NOT support OTLP logs — only traces + metrics — as of falcosidekick 2.31). Routing Falco events through Alloy → Loki is a future iteration.
                     type: string
             required:
             - clusterName

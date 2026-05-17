@@ -103,6 +103,7 @@
   {{- $observeEnabled = $observe.enabled }}
 {{- end }}
 {{- $alloyReceiverEndpoint := $observe.alloyReceiverEndpoint | default "http://alloy-receiver.monitoring.svc.cluster.local:4318" }}
+{{- $lokiEndpoint := $observe.lokiEndpoint | default "http://loki-gateway.monitoring.svc.cluster.local" }}
 
 # ==============================================================================
 # Initialize $state
@@ -150,6 +151,7 @@
   "observe" (dict
     "enabled" $observeEnabled
     "alloyReceiverEndpoint" $alloyReceiverEndpoint
+    "lokiEndpoint" $lokiEndpoint
   )
   "observed" (dict)
   "status" (dict)
