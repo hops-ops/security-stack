@@ -13,3 +13,5 @@ spec:
   falco:
     namespace: falco
     driver: modern_ebpf
+  kubescape:
+    namespace: kubescape

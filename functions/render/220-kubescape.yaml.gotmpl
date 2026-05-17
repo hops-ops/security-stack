@@ -1,0 +1,96 @@
+# code: language=yaml
+#
+# Helm Release: kubescape (kubescape-operator chart)
+#
+# Chart:    https://kubescape.github.io/helm-charts/ (chart name: kubescape-operator)
+# Upstream: https://github.com/kubescape/helm-charts
+#
+# Capabilities are pre-tuned to COMPLEMENT (not duplicate) Trivy + Falco + Kyverno:
+#
+#   ENABLED — what Kubescape uniquely contributes to the stack:
+#     - operator                    : base controller (always required)
+#     - configurationScan           : K8s manifest posture against named frameworks
+#                                     (NSA, MITRE ATT&CK, CIS) — Trivy doesn't do this
+#     - continuousScan              : periodic re-evaluation as cluster state changes
+#     - nodeScan                    : DaemonSet host-scanner — per-node CIS that works
+#                                     on EKS Auto Mode (Trivy node-collector cannot)
+#
+#   DISABLED — owned by other stacks/tools, avoid double-coverage:
+#     - vulnerabilityScan + relevancy + nodeSbomGeneration : Trivy owns image vuln + SBOM
+#     - runtimeDetection + malwareDetection + runtimeObservability + httpDetection :
+#         Falco owns kernel-level runtime threat detection
+#     - admissionController         : Kyverno (policy-stack) owns admission
+#     - networkPolicyService        : deferred to network-policy iteration
+#     - manageWorkloads / syncSBOM / seccompProfileService / nodeProfileService :
+#         not first-pass scope
+#
+# wait: false — Kubescape ships a DaemonSet host-scanner. Same per-node-pod-cap
+# rationale as Falco; see reference_helm_wait_for_daemonsets memory.
+#
+
+{{- $ks := $state.kubescape }}
+{{- if $ks.enabled }}
+---
+apiVersion: helm.m.crossplane.io/v1beta1
+kind: Release
+metadata:
+  name: {{ $ks.releaseName }}
+  annotations:
+    {{ setResourceNameAnnotation "kubescape" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  forProvider:
+    chart:
+      name: kubescape-operator
+      repository: https://kubescape.github.io/helm-charts/
+      version: {{ $ks.chartVersion | quote }}
+    namespace: {{ $ks.namespace }}
+    wait: false
+    {{- if gt (len $ks.overrideAllValues) 0 }}
+    values:
+      {{- toYaml $ks.overrideAllValues | nindent 6 }}
+    {{- else }}
+    values:
+      clusterName: {{ $state.clusterName | quote }}
+      ksNamespace: {{ $ks.namespace }}
+      capabilities:
+        # Base
+        operator: enable
+        # Configuration scanning — Kubescape's signature value-add
+        configurationScan: enable
+        continuousScan: enable
+        nodeScan: enable
+        # Image vuln scanning — Trivy owns this
+        vulnerabilityScan: disable
+        relevancy: disable
+        nodeSbomGeneration: disable
+        scanEmbeddedSBOMs: disable
+        vexGeneration: disable
+        # Runtime detection — Falco owns this
+        runtimeObservability: disable
+        runtimeDetection: disable
+        malwareDetection: disable
+        httpDetection: disable
+        # Admission — Kyverno (policy-stack) owns this
+        admissionController: disable
+        # Network policy generation — deferred
+        networkPolicyService: disable
+        networkEventsStreaming: disable
+        # Not first-pass scope
+        nodeProfileService: disable
+        seccompProfileService: disable
+        manageWorkloads: disable
+        syncSBOM: disable
+        riskAcceptance: disable
+        # Telemetry hooks — wired by future observe integration
+        prometheusExporter: disable
+      {{- if gt (len $ks.values) 0 }}
+      {{- toYaml $ks.values | nindent 6 }}
+      {{- end }}
+    {{- end }}
+  rollbackLimit: 3
+  providerConfigRef:
+    name: {{ $state.helmProviderConfigRef.name }}
+    kind: {{ $state.helmProviderConfigRef.kind }}
+{{- end }}

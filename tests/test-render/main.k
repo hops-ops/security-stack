@@ -11,10 +11,11 @@ import models.io.upbound.dev.meta.v1alpha1 as metav1alpha1
 
 _items = [
     # ==========================================================================
-    # Test 1: minimal claim renders trivy + falco Helm releases and namespaces.
+    # Test 1: minimal claim renders trivy + falco + kubescape Helm releases
+    #         and their namespaces.
     # ==========================================================================
     metav1alpha1.CompositionTest {
-        metadata.name = "minimal-renders-both-releases"
+        metadata.name = "minimal-renders-all-three-releases"
         spec = {
             compositionPath = "apis/securitystacks/composition.yaml"
             xrdPath = "apis/securitystacks/definition.yaml"
@@ -52,6 +53,19 @@ _items = [
                     }
                 }
                 {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "kubescape"
+                    spec.forProvider = {
+                        chart = {
+                            name = "kubescape-operator"
+                            repository = "https://kubescape.github.io/helm-charts/"
+                            version = "1.40.1"
+                        }
+                        namespace = "kubescape"
+                    }
+                }
+                {
                     apiVersion = "kubernetes.m.crossplane.io/v1alpha1"
                     kind = "Object"
                     metadata.name = "security-namespace-trivy"
@@ -69,6 +83,16 @@ _items = [
                         apiVersion = "v1"
                         kind = "Namespace"
                         metadata.name = "falco"
+                    }
+                }
+                {
+                    apiVersion = "kubernetes.m.crossplane.io/v1alpha1"
+                    kind = "Object"
+                    metadata.name = "security-namespace-kubescape"
+                    spec.forProvider.manifest = {
+                        apiVersion = "v1"
+                        kind = "Namespace"
+                        metadata.name = "kubescape"
                     }
                 }
             ]
@@ -111,7 +135,7 @@ _items = [
     }
 
     # ==========================================================================
-    # Test 3: falco disabled — only trivy release + its namespace render.
+    # Test 3: falco disabled — only trivy + kubescape releases render.
     # ==========================================================================
     metav1alpha1.CompositionTest {
         metadata.name = "falco-disabled-skips-its-release"
@@ -121,7 +145,7 @@ _items = [
             timeoutSeconds = 60
             validate = False
             xr = stacksv1alpha1.SecurityStack {
-                metadata.name = "trivy-only"
+                metadata.name = "trivy-and-kubescape"
                 spec = {
                     clusterName = "my-cluster"
                     falco = {enabled = False}
@@ -133,12 +157,17 @@ _items = [
                     kind = "Release"
                     metadata.name = "trivy-operator"
                 }
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "kubescape"
+                }
             ]
         }
     }
 
     # ==========================================================================
-    # Test 4: trivy disabled — only falco release renders.
+    # Test 4: trivy disabled — only falco + kubescape render.
     # ==========================================================================
     metav1alpha1.CompositionTest {
         metadata.name = "trivy-disabled-skips-its-release"
@@ -148,7 +177,7 @@ _items = [
             timeoutSeconds = 60
             validate = False
             xr = stacksv1alpha1.SecurityStack {
-                metadata.name = "falco-only"
+                metadata.name = "falco-and-kubescape"
                 spec = {
                     clusterName = "my-cluster"
                     trivy = {enabled = False}
@@ -160,12 +189,49 @@ _items = [
                     kind = "Release"
                     metadata.name = "falco"
                 }
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "kubescape"
+                }
             ]
         }
     }
 
     # ==========================================================================
-    # Test 5: custom chart versions propagate.
+    # Test 5: kubescape disabled — only trivy + falco render.
+    # ==========================================================================
+    metav1alpha1.CompositionTest {
+        metadata.name = "kubescape-disabled-skips-its-release"
+        spec = {
+            compositionPath = "apis/securitystacks/composition.yaml"
+            xrdPath = "apis/securitystacks/definition.yaml"
+            timeoutSeconds = 60
+            validate = False
+            xr = stacksv1alpha1.SecurityStack {
+                metadata.name = "trivy-and-falco"
+                spec = {
+                    clusterName = "my-cluster"
+                    kubescape = {enabled = False}
+                }
+            }
+            assertResources = [
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "trivy-operator"
+                }
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "falco"
+                }
+            ]
+        }
+    }
+
+    # ==========================================================================
+    # Test 6: custom chart versions propagate (including kubescape).
     # ==========================================================================
     metav1alpha1.CompositionTest {
         metadata.name = "custom-chart-versions-propagate"
@@ -180,6 +246,7 @@ _items = [
                     clusterName = "my-cluster"
                     trivy = {chartVersion = "0.29.3"}
                     falco = {chartVersion = "6.1.0"}
+                    kubescape = {chartVersion = "1.39.0"}
                 }
             }
             assertResources = [
@@ -194,6 +261,86 @@ _items = [
                     kind = "Release"
                     metadata.name = "falco"
                     spec.forProvider.chart.version = "6.1.0"
+                }
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "kubescape"
+                    spec.forProvider.chart.version = "1.39.0"
+                }
+            ]
+        }
+    }
+
+    # ==========================================================================
+    # Test 7: kubescape clusterName flows from spec.clusterName.
+    # ==========================================================================
+    metav1alpha1.CompositionTest {
+        metadata.name = "kubescape-clusterName-flows-from-spec"
+        spec = {
+            compositionPath = "apis/securitystacks/composition.yaml"
+            xrdPath = "apis/securitystacks/definition.yaml"
+            timeoutSeconds = 60
+            validate = False
+            xr = stacksv1alpha1.SecurityStack {
+                metadata.name = "cluster-name-test"
+                spec.clusterName = "prod-eu-west-1"
+            }
+            assertResources = [
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "kubescape"
+                    spec.forProvider.values.clusterName = "prod-eu-west-1"
+                }
+            ]
+        }
+    }
+
+    # ==========================================================================
+    # Test 8: kubescape capabilities default to "disable" for tools owned
+    #         elsewhere (avoid double-coverage with trivy/falco/kyverno).
+    # ==========================================================================
+    metav1alpha1.CompositionTest {
+        metadata.name = "kubescape-capabilities-avoid-double-coverage"
+        spec = {
+            compositionPath = "apis/securitystacks/composition.yaml"
+            xrdPath = "apis/securitystacks/definition.yaml"
+            timeoutSeconds = 60
+            validate = False
+            xr = stacksv1alpha1.SecurityStack {
+                metadata.name = "caps-test"
+                spec.clusterName = "my-cluster"
+            }
+            assertResources = [
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "kubescape"
+                    spec.forProvider.values.capabilities = {
+                        operator = "enable"
+                        configurationScan = "enable"
+                        continuousScan = "enable"
+                        nodeScan = "enable"
+                        vulnerabilityScan = "disable"
+                        relevancy = "disable"
+                        nodeSbomGeneration = "disable"
+                        scanEmbeddedSBOMs = "disable"
+                        vexGeneration = "disable"
+                        runtimeObservability = "disable"
+                        runtimeDetection = "disable"
+                        malwareDetection = "disable"
+                        httpDetection = "disable"
+                        admissionController = "disable"
+                        networkPolicyService = "disable"
+                        networkEventsStreaming = "disable"
+                        nodeProfileService = "disable"
+                        seccompProfileService = "disable"
+                        manageWorkloads = "disable"
+                        syncSBOM = "disable"
+                        riskAcceptance = "disable"
+                        prometheusExporter = "disable"
+                    }
                 }
             ]
         }

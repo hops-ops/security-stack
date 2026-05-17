@@ -60,3 +60,33 @@ spec:
     name: {{ $k8sPCR.name }}
     kind: {{ $k8sPCR.kind }}
 {{- end }}
+
+# ==============================================================================
+# Namespace: kubescape (only if distinct from trivy/falco)
+# ==============================================================================
+{{- $ksNs := $state.kubescape.namespace }}
+{{- $ksDistinct := true }}
+{{- if and $state.trivy.enabled (eq $ksNs $state.trivy.namespace) }}{{- $ksDistinct = false }}{{- end }}
+{{- if and $state.falco.enabled (eq $ksNs $state.falco.namespace) }}{{- $ksDistinct = false }}{{- end }}
+{{- if and $state.kubescape.enabled $ksDistinct }}
+---
+apiVersion: kubernetes.m.crossplane.io/v1alpha1
+kind: Object
+metadata:
+  name: {{ $state.name }}-namespace-kubescape
+  annotations:
+    {{ setResourceNameAnnotation "namespace-kubescape" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  forProvider:
+    manifest:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: {{ $state.kubescape.namespace }}
+        labels: {{ $state.labels | toJson }}
+  providerConfigRef:
+    name: {{ $k8sPCR.name }}
+    kind: {{ $k8sPCR.kind }}
+{{- end }}

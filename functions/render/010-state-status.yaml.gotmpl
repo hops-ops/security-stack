@@ -8,7 +8,7 @@
 {{- $observed := $.observed.resources | default dict }}
 
 {{- $checkReady := dict }}
-{{- range $key := list "trivy" "falco" "namespace-trivy" "namespace-falco" }}
+{{- range $key := list "trivy" "falco" "kubescape" "namespace-trivy" "namespace-falco" "namespace-kubescape" }}
   {{- $entry := get $observed $key | default dict }}
   {{- $resource := $entry.resource | default dict }}
   {{- $status := $resource.status | default dict }}
@@ -24,8 +24,10 @@
 {{- $state = set $state "observed" (dict
   "trivy" (dict "ready" (get $checkReady "trivy"))
   "falco" (dict "ready" (get $checkReady "falco"))
+  "kubescape" (dict "ready" (get $checkReady "kubescape"))
   "namespaceTrivy" (dict "ready" (get $checkReady "namespace-trivy"))
   "namespaceFalco" (dict "ready" (get $checkReady "namespace-falco"))
+  "namespaceKubescape" (dict "ready" (get $checkReady "namespace-kubescape"))
 ) }}
 
 # Overall ready: every enabled component must be Ready. Mirrors the typed
@@ -37,9 +39,13 @@
 {{- if $state.falco.enabled }}
   {{- if not (get $checkReady "falco") }}{{- $overallReady = false }}{{- end }}
 {{- end }}
+{{- if $state.kubescape.enabled }}
+  {{- if not (get $checkReady "kubescape") }}{{- $overallReady = false }}{{- end }}
+{{- end }}
 
 {{- $state = set $state "status" (dict
   "ready" $overallReady
   "trivy" (dict "ready" (get $checkReady "trivy"))
   "falco" (dict "ready" (get $checkReady "falco"))
+  "kubescape" (dict "ready" (get $checkReady "kubescape"))
 ) }}

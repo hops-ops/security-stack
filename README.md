@@ -1,8 +1,9 @@
 # security-stack
 
-Installs **Trivy Operator** (image / IaC / k8s-config / RBAC / exposed-secret scanning)
-and **Falco** (eBPF runtime threat detection) on a target Kubernetes cluster via two
-Helm Releases.
+Installs **Trivy Operator** (workload vuln / IaC / RBAC / exposed-secret / SBOM
+scanning), **Falco** (eBPF runtime threat detection), and **Kubescape** (CNCF
+Incubating posture + framework reports + per-node CIS via DaemonSet host-scanner)
+on a target Kubernetes cluster via three Helm Releases.
 
 Cloud-neutral. Group: `hops.ops.com.ai`.
 
@@ -14,9 +15,14 @@ Kyverno engine that stack installs.
 
 - **Trivy Operator** — runs Trivy as a controller that produces
   `VulnerabilityReport`, `ConfigAuditReport`, `RbacAssessmentReport`,
-  `ExposedSecretReport` CRs against workloads in the cluster.
+  `ExposedSecretReport`, `SbomReport` CRs against workloads in the cluster.
 - **Falco** — DaemonSet that watches kernel syscalls via eBPF and raises events
   against a configurable ruleset. Ships with the standard Falco rules.
+- **Kubescape** — CNCF Incubating posture scanner. Operator + DaemonSet
+  `host-scanner` (works on EKS Auto Mode where Trivy's per-node Job-with-hostname-
+  selector wedges). Produces framework reports against NSA, MITRE ATT&CK, CIS.
+  Capabilities are pre-tuned to complement Trivy + Falco + Kyverno: vuln scan /
+  runtime detection / admission controller all disabled to avoid double-coverage.
 
 ## What's NOT (yet) included
 
@@ -66,6 +72,8 @@ spec:
       resources:
         requests: { cpu: 250m, memory: 512Mi }
         limits:   { cpu: 1000m, memory: 1Gi }
+  kubescape:
+    namespace: kubescape
 ```
 
 ## Defaults of note
@@ -93,9 +101,14 @@ Apply a SecurityStack manifest and watch:
 ```bash
 kubectl get securitystacks -A
 kubectl get releases.helm.m.crossplane.io
-kubectl get pods -n trivy-system
-kubectl get pods -n falco
-kubectl get vulnerabilityreports -A
+kubectl get pods -n trivy-system -n falco -n kubescape
+kubectl get vulnerabilityreports -A          # Trivy
+kubectl get configauditreports -A            # Trivy
+kubectl get sbomreports -A                   # Trivy
+kubectl get exposedsecretreports -A          # Trivy
+kubectl get clusterinfraassessmentreports    # Trivy (or Kubescape on Auto Mode)
+kubectl get applicationprofiles -A           # Kubescape
+kubectl get workloadconfigurationscans -A    # Kubescape
 ```
 
 ## References
@@ -104,4 +117,5 @@ kubectl get vulnerabilityreports -A
 - Related task: [tasks/security-stack-install] in GitKB
 - Trivy Operator: https://aquasecurity.github.io/trivy-operator/
 - Falco: https://falco.org/docs/
+- Kubescape: https://kubescape.io/docs/
 - Pairs with: [policy-stack]

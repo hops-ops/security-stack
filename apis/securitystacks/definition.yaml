@@ -116,6 +116,31 @@ spec:
                     description: Helm values that replace all defaults entirely.
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
+              kubescape:
+                description: 'Kubescape (CNCF Incubating) configuration — posture + framework reports (NSA, MITRE ATT&CK, CIS) + DaemonSet-based per-node CIS via host-scanner (works on EKS Auto Mode where Trivy node-collector cannot). Capabilities are pre-tuned to complement (not duplicate) Trivy + Falco + Kyverno: vulnerabilityScan/runtimeDetection/admissionController disabled; configurationScan + continuousScan + nodeScan enabled.'
+                type: object
+                properties:
+                  enabled:
+                    description: Whether to install Kubescape. Defaults to true.
+                    type: boolean
+                    default: true
+                  namespace:
+                    description: Namespace for the Kubescape Helm release. Defaults to "kubescape".
+                    type: string
+                  releaseName:
+                    description: Helm release name. Defaults to "kubescape".
+                    type: string
+                  chartVersion:
+                    description: Kubescape Helm chart version (chart kubescape-operator). Default 1.40.1.
+                    type: string
+                  values:
+                    description: Helm values merged on top of the stack's defaults. Use this to override individual capability toggles or extend excludeNamespaces.
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                  overrideAllValues:
+                    description: Helm values that replace all defaults entirely.
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
             required:
             - clusterName
           status:
@@ -131,6 +156,11 @@ spec:
                   ready:
                     type: boolean
               falco:
+                type: object
+                properties:
+                  ready:
+                    type: boolean
+              kubescape:
                 type: object
                 properties:
                   ready:

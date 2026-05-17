@@ -16,17 +16,18 @@ spec:
     kind: Provider
     package: xpkg.crossplane.io/crossplane-contrib/provider-kubernetes
     version: '>=v1'
-  description: Security stack — Trivy Operator (image / IaC / k8s-config scanning)
-    + Falco (eBPF runtime threat detection). Cloud-neutral. First pass ships engine
-    helm releases only; supply-chain ClusterPolicies / scan-result enforcement / sidekick
-    OTel wiring land in subsequent iterations.
+  description: Security stack — Trivy Operator (workload vuln + IaC + RBAC + exposed-secret
+    + SBOM scanning), Falco (eBPF runtime threat detection), and Kubescape (CNCF Incubating
+    posture + framework reports + per-node CIS via DaemonSet host-scanner). Cloud-neutral.
+    Supply-chain ClusterPolicies / scan-result enforcement / sidekick OTel wiring
+    land in subsequent iterations.
   license: Apache-2.0
   maintainer: Patrick Lee Scott <pat@patscott.io>
   readme: |
     # security-stack
 
-    Installs Trivy Operator + Falco on a target Kubernetes cluster.
-    Rides on policy-stack — supply-chain ClusterPolicies (added later)
-    compose against Kyverno installed by that stack.
+    Installs Trivy Operator + Falco + Kubescape on a target Kubernetes
+    cluster. Rides on policy-stack — supply-chain ClusterPolicies (added
+    later) compose against Kyverno installed by that stack.
   repository: ghcr.io/hops-ops/security-stack
   source: github.com/hops-ops/security-stack

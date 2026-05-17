@@ -64,6 +64,18 @@
 {{- $flDriver := $fl.driver | default "modern_ebpf" }}
 
 # ==============================================================================
+# Kubescape component
+# ==============================================================================
+{{- $ks := $spec.kubescape | default dict }}
+{{- $ksEnabled := true }}
+{{- if hasKey $ks "enabled" }}
+  {{- $ksEnabled = $ks.enabled }}
+{{- end }}
+{{- $ksNamespace := $ks.namespace | default "kubescape" }}
+{{- $ksReleaseName := $ks.releaseName | default "kubescape" }}
+{{- $ksChartVersion := $ks.chartVersion | default "1.40.1" }}
+
+# ==============================================================================
 # Initialize $state
 # ==============================================================================
 {{- $state := dict
@@ -89,6 +101,14 @@
     "driver" $flDriver
     "values" ($fl.values | default dict)
     "overrideAllValues" ($fl.overrideAllValues | default dict)
+  )
+  "kubescape" (dict
+    "enabled" $ksEnabled
+    "namespace" $ksNamespace
+    "releaseName" $ksReleaseName
+    "chartVersion" $ksChartVersion
+    "values" ($ks.values | default dict)
+    "overrideAllValues" ($ks.overrideAllValues | default dict)
   )
   "observed" (dict)
   "status" (dict)
