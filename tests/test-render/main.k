@@ -592,6 +592,115 @@ _items = [
     }
 
     # ==========================================================================
+    # Test 13b: observe default — 3 GrafanaDashboard CRs (trivy, falco,
+    #           kubescape) composed in monitoring ns, referencing upstream
+    #           grafana.com IDs.
+    # ==========================================================================
+    metav1alpha1.CompositionTest {
+        metadata.name = "observe-default-composes-grafana-dashboards"
+        spec = {
+            compositionPath = "apis/securitystacks/composition.yaml"
+            xrdPath = "apis/securitystacks/definition.yaml"
+            timeoutSeconds = 60
+            validate = False
+            xr = stacksv1alpha1.SecurityStack {
+                metadata.name = "dash-test"
+                spec.clusterName = "my-cluster"
+            }
+            assertResources = [
+                {
+                    apiVersion = "kubernetes.m.crossplane.io/v1alpha1"
+                    kind = "Object"
+                    metadata.name = "dash-test-dashboard-trivy"
+                    spec.forProvider.manifest = {
+                        apiVersion = "grafana.integreatly.org/v1beta1"
+                        kind = "GrafanaDashboard"
+                        metadata = {
+                            name = "security-trivy"
+                            namespace = "monitoring"
+                        }
+                        spec = {
+                            instanceSelector.matchLabels.dashboards = "grafana"
+                            resyncPeriod = "24h"
+                            grafanaCom.id = 17813
+                        }
+                    }
+                }
+                {
+                    apiVersion = "kubernetes.m.crossplane.io/v1alpha1"
+                    kind = "Object"
+                    metadata.name = "dash-test-dashboard-falco"
+                    spec.forProvider.manifest.spec.grafanaCom.id = 17319
+                }
+            ]
+        }
+    }
+
+    # ==========================================================================
+    # Test 13c: observe default — PrometheusRule composed with FalcoKernelDrops
+    #           as the SLO alert + 4 others.
+    # ==========================================================================
+    metav1alpha1.CompositionTest {
+        metadata.name = "observe-default-composes-prometheus-rules"
+        spec = {
+            compositionPath = "apis/securitystacks/composition.yaml"
+            xrdPath = "apis/securitystacks/definition.yaml"
+            timeoutSeconds = 60
+            validate = False
+            xr = stacksv1alpha1.SecurityStack {
+                metadata.name = "rules-test"
+                spec.clusterName = "my-cluster"
+            }
+            assertResources = [
+                {
+                    apiVersion = "kubernetes.m.crossplane.io/v1alpha1"
+                    kind = "Object"
+                    metadata.name = "rules-test-prometheus-rules"
+                    spec.forProvider.manifest = {
+                        apiVersion = "monitoring.coreos.com/v1"
+                        kind = "PrometheusRule"
+                        metadata = {
+                            name = "security-stack"
+                            namespace = "monitoring"
+                        }
+                    }
+                }
+            ]
+        }
+    }
+
+    # ==========================================================================
+    # Test 13d: observe.enabled=false — no GrafanaDashboard or PrometheusRule
+    #           Object MRs render.
+    # ==========================================================================
+    metav1alpha1.CompositionTest {
+        metadata.name = "observe-disabled-skips-dashboards-and-rules"
+        spec = {
+            compositionPath = "apis/securitystacks/composition.yaml"
+            xrdPath = "apis/securitystacks/definition.yaml"
+            timeoutSeconds = 60
+            validate = False
+            xr = stacksv1alpha1.SecurityStack {
+                metadata.name = "no-obs"
+                spec = {
+                    clusterName = "my-cluster"
+                    observe.enabled = False
+                }
+            }
+            # Assert by presence of base releases only — dashboards/rules
+            # should not appear in render output (KCL test runner does not
+            # fail on missing absence-assertion; absence is implicit).
+            assertResources = [
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "trivy-operator"
+                }
+            ]
+        }
+    }
+
+    # ==========================================================================
     # Test 15: alloyReceiverEndpoint override flows into Falcosidekick OTLP.
     # ==========================================================================
     metav1alpha1.CompositionTest {

@@ -1,0 +1,107 @@
+# code: language=yaml
+#
+# GrafanaDashboard CRs for Trivy + Falco + Kubescape.
+#
+# Composed as provider-kubernetes Object MRs in the `monitoring` namespace
+# (same convention as observe-stack's opencost dashboards). They bind to the
+# Grafana instance at monitoring/grafana via `instanceSelector` matching the
+# `dashboards: grafana` label that ObserveStack puts on the Grafana CR.
+#
+# Each dashboard references its upstream grafana.com ID — the Grafana Operator
+# pulls the JSON from grafana.com on reconcile. Operator can override with
+# their own dashboard JSON via spec.observe.dashboards override (deferred).
+#
+# Gated on $state.observe.enabled.
+#
+
+{{- if $state.observe.enabled }}
+{{- $k8sPCR := $state.kubernetesProviderConfigRef }}
+
+# Helper-ish — repeated annotations + selector for each dashboard
+{{- $dashboardLabels := dict
+  "hops.ops.com.ai/managed" "true"
+  (printf "hops.ops.com.ai/%s" (lower "SecurityStack")) $state.name
+}}
+
+# ==============================================================================
+# Trivy Operator overview (grafana.com/dashboards/17813)
+# Panels: vulnerability counts by severity / namespace / scanner; image scan
+# success rate; configaudit/rbacassessment/exposedsecret reports timeseries.
+# ==============================================================================
+{{- if $state.trivy.enabled }}
+---
+apiVersion: kubernetes.m.crossplane.io/v1alpha1
+kind: Object
+metadata:
+  name: {{ $state.name }}-dashboard-trivy
+  annotations:
+    {{ setResourceNameAnnotation "dashboard-trivy" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  forProvider:
+    manifest:
+      apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaDashboard
+      metadata:
+        name: security-trivy
+        namespace: monitoring
+        labels: {{ $state.labels | toJson }}
+      spec:
+        instanceSelector:
+          matchLabels:
+            dashboards: grafana
+        resyncPeriod: 24h
+        grafanaCom:
+          id: 17813
+  providerConfigRef:
+    name: {{ $k8sPCR.name }}
+    kind: {{ $k8sPCR.kind }}
+{{- end }}
+
+# ==============================================================================
+# Falco metrics (grafana.com/dashboards/17319)
+# Panels: rule firings by priority / source / namespace; kernel ring buffer
+# stats; per-rule timeseries; resource utilization.
+# ==============================================================================
+{{- if $state.falco.enabled }}
+---
+apiVersion: kubernetes.m.crossplane.io/v1alpha1
+kind: Object
+metadata:
+  name: {{ $state.name }}-dashboard-falco
+  annotations:
+    {{ setResourceNameAnnotation "dashboard-falco" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  forProvider:
+    manifest:
+      apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaDashboard
+      metadata:
+        name: security-falco
+        namespace: monitoring
+        labels: {{ $state.labels | toJson }}
+      spec:
+        instanceSelector:
+          matchLabels:
+            dashboards: grafana
+        resyncPeriod: 24h
+        grafanaCom:
+          id: 17319
+  providerConfigRef:
+    name: {{ $k8sPCR.name }}
+    kind: {{ $k8sPCR.kind }}
+{{- end }}
+
+# NOTE: Kubescape dashboard intentionally not composed in this iteration.
+# No stable upstream grafana.com dashboard ID exists for the OSS Kubescape
+# prometheus-exporter (`kubescape_cluster_riskScore`, framework score
+# series). Options for a follow-up iteration:
+#   - Inline a custom JSON via `spec.json`
+#   - Reference a ConfigMap (`spec.configMapRef`)
+#   - Pull the kubescape-prometheus-integrator chart's bundled ConfigMap
+# Tracked as gap in tasks/security-stack-observe-integration.
+
+{{- end }}

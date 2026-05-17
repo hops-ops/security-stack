@@ -1,0 +1,188 @@
+# code: language=yaml
+#
+# PrometheusRule with SecurityStack alerts.
+#
+# Composed as a provider-kubernetes Object MR in the `monitoring` namespace
+# where the kube-prometheus-stack Prometheus instance lives. Selector on the
+# Prometheus is empty so no special label gymnastics required.
+#
+# Five alerts, ordered by severity-of-failure-to-detect:
+#
+#   1. FalcoKernelDrops          — THE SLO. Silent detection-loss is the worst
+#                                  failure mode. If the kernel ring buffer
+#                                  drops events, Falco isn't seeing the world.
+#   2. FalcoControllerDown       — Falco DaemonSet pods unavailable on N nodes
+#                                  means runtime detection is blind on those
+#                                  nodes (Auto Mode per-node pod cap, taints,
+#                                  CrashLoop, etc.)
+#   3. TrivyScanFailing          — VulnerabilityReports stop refreshing →
+#                                  CVE blind spots accumulate silently.
+#   4. TrivyCriticalVulnerability — workloads running with CRITICAL CVEs.
+#                                  Audit-only signal; admission gating is a
+#                                  separate iteration.
+#   5. KubescapePostureRegression — overall cluster posture score drops below
+#                                   threshold (framework compliance drift).
+#
+# Gated on $state.observe.enabled.
+#
+
+{{- if $state.observe.enabled }}
+{{- $k8sPCR := $state.kubernetesProviderConfigRef }}
+---
+apiVersion: kubernetes.m.crossplane.io/v1alpha1
+kind: Object
+metadata:
+  name: {{ $state.name }}-prometheus-rules
+  annotations:
+    {{ setResourceNameAnnotation "prometheus-rules" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  forProvider:
+    manifest:
+      apiVersion: monitoring.coreos.com/v1
+      kind: PrometheusRule
+      metadata:
+        name: security-stack
+        namespace: monitoring
+        labels: {{ $state.labels | toJson }}
+      spec:
+        groups:
+          {{- if $state.falco.enabled }}
+          - name: security-stack.falco
+            interval: 30s
+            rules:
+              # ------------------------------------------------------------
+              # THE SLO: Falco kernel ring buffer dropping events.
+              # If this fires, syscalls are being missed — Falco's
+              # detection coverage is degraded.
+              # ------------------------------------------------------------
+              - alert: FalcoKernelDrops
+                expr: rate(falcosecurity_falco_n_drops_total[5m]) > 0
+                for: 5m
+                labels:
+                  severity: critical
+                  stack: security
+                  component: falco
+                annotations:
+                  summary: "Falco is dropping kernel events on {{`{{ $labels.instance }}`}}"
+                  description: |
+                    Falco's kernel ring buffer dropped events at a rate of
+                    {{`{{ $value | humanize }}`}} events/s over the past 5m on
+                    {{`{{ $labels.instance }}`}}. Dropped events = lost detections.
+                    Investigate: ring buffer size, eBPF program performance,
+                    noisy syscall sources to exclude.
+                  runbook_url: "https://falco.org/docs/concepts/dropped-events/"
+
+              # ------------------------------------------------------------
+              # Falco controller availability — DaemonSet pods on each node.
+              # On pat-local hit "Too many pods" cap — those nodes are
+              # uncovered for runtime detection.
+              # ------------------------------------------------------------
+              - alert: FalcoControllerUnavailable
+                expr: kube_daemonset_status_number_unavailable{daemonset="falco",namespace="{{ $state.falco.namespace }}"} > 0
+                for: 10m
+                labels:
+                  severity: warning
+                  stack: security
+                  component: falco
+                annotations:
+                  summary: "Falco DaemonSet has {{`{{ $value }}`}} unavailable pods"
+                  description: |
+                    Falco DaemonSet in {{ $state.falco.namespace }} has
+                    {{`{{ $value }}`}} unavailable pods. Runtime detection is
+                    not running on those nodes. Common causes: node per-pod
+                    cap (EKS VPC CNI ENI limit), missing tolerations, image
+                    pull failures, eBPF program load failures.
+
+              # ------------------------------------------------------------
+              # Critical-priority Falco rules firing — admission-time
+              # security incident signal.
+              # ------------------------------------------------------------
+              - alert: FalcoCriticalRuleFiring
+                expr: sum by (rule) (rate(falcosecurity_falco_rules_matched_total{priority=~"Critical|Emergency"}[5m])) > 0
+                for: 0m
+                labels:
+                  severity: critical
+                  stack: security
+                  component: falco
+                annotations:
+                  summary: "Critical Falco rule firing: {{`{{ $labels.rule }}`}}"
+                  description: |
+                    Falco rule {{`{{ $labels.rule }}`}} (priority Critical or
+                    Emergency) fired at {{`{{ $value | humanize }}`}}/s.
+                    Investigate via Grafana → Loki → security-falco dashboard,
+                    filter on rule={{`{{ $labels.rule }}`}}.
+          {{- end }}
+
+          {{- if $state.trivy.enabled }}
+          - name: security-stack.trivy
+            interval: 1m
+            rules:
+              # ------------------------------------------------------------
+              # Trivy scan jobs failing — VulnerabilityReports go stale,
+              # CVE blind spots accumulate silently.
+              # ------------------------------------------------------------
+              - alert: TrivyScanFailing
+                expr: increase(trivy_image_scans_total{result="error"}[15m]) > 5
+                for: 15m
+                labels:
+                  severity: warning
+                  stack: security
+                  component: trivy
+                annotations:
+                  summary: "Trivy image scans failing in {{`{{ $labels.namespace }}`}}"
+                  description: |
+                    Trivy operator has logged >5 image scan failures in the
+                    past 15 minutes for workloads in {{`{{ $labels.namespace }}`}}.
+                    VulnerabilityReports for affected workloads will be stale.
+                    Check trivy-operator logs and individual scan job pod logs.
+
+              # ------------------------------------------------------------
+              # Workload running with CRITICAL vulnerabilities — Audit
+              # signal. Admission gating is the next iteration.
+              # ------------------------------------------------------------
+              - alert: TrivyCriticalVulnerability
+                expr: sum by (namespace, name) (trivy_image_vulnerabilities{severity="Critical"}) > 0
+                for: 1h
+                labels:
+                  severity: warning
+                  stack: security
+                  component: trivy
+                annotations:
+                  summary: "Workload {{`{{ $labels.namespace }}/{{ $labels.name }}`}} has CRITICAL vulnerabilities"
+                  description: |
+                    Workload {{`{{ $labels.namespace }}/{{ $labels.name }}`}} has
+                    {{`{{ $value }}`}} CRITICAL vulnerabilities. Inspect the
+                    VulnerabilityReport CRs in {{`{{ $labels.namespace }}`}}.
+                    Until ImageValidatingPolicy admission gating lands, this
+                    is an audit signal only.
+          {{- end }}
+
+          {{- if $state.kubescape.enabled }}
+          - name: security-stack.kubescape
+            interval: 1m
+            rules:
+              # ------------------------------------------------------------
+              # Cluster posture score regression — overall framework
+              # compliance dropped below acceptable threshold.
+              # ------------------------------------------------------------
+              - alert: KubescapePostureRegression
+                expr: kubescape_cluster_riskScore > 30
+                for: 15m
+                labels:
+                  severity: warning
+                  stack: security
+                  component: kubescape
+                annotations:
+                  summary: "Kubescape cluster risk score above threshold ({{`{{ $value | humanize }}`}})"
+                  description: |
+                    Kubescape's overall cluster risk score is {{`{{ $value | humanize }}`}}
+                    (threshold: 30). New misconfiguration or regression detected.
+                    Inspect WorkloadConfigurationScan CRs to find which workloads
+                    contribute most to the score.
+          {{- end }}
+  providerConfigRef:
+    name: {{ $k8sPCR.name }}
+    kind: {{ $k8sPCR.kind }}
+{{- end }}
