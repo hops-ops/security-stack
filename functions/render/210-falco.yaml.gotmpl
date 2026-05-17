@@ -70,13 +70,45 @@ spec:
           operator: Exists
         - effect: NoExecute
           operator: Exists
+      {{- if $state.observe.enabled }}
+      # Falco's native metrics endpoint at :8765/metrics — required for the
+      # ServiceMonitor below to have anything to scrape. `scap_n_drops_total`
+      # is the key SLI for kernel ring-buffer pressure (drop events == lost
+      # detections).
+      metrics:
+        enabled: true
+        interval: 1h
+        outputRule: true
+        resourceUtilizationEnabled: true
+        rulesCountersEnabled: true
+        kernelEventCountersEnabled: true
+        libbpfStatsEnabled: true
+      {{- end }}
       falcosidekick:
-        # Off until output routing iteration lands. Enabling it without an
-        # output destination is noise.
-        enabled: false
+        # Gated on spec.observe.enabled. When enabled, Falcosidekick ships
+        # Falco events to the ObserveStack Alloy receiver via OTLP:
+        #   - logs   → routed to Loki by Alloy
+        #   - traces → routed to Tempo by Alloy (syscall source only)
+        # See spec.security-stack ObserveStack integration section for the
+        # full Alloy receiver pipeline config (otelcol.receiver.otlp →
+        # batch processor → loki.write / otelcol.exporter.otlp.tempo).
+        enabled: {{ $state.observe.enabled }}
+        {{- if $state.observe.enabled }}
+        config:
+          otlp:
+            logs:
+              endpoint: "{{ $state.observe.alloyReceiverEndpoint }}/v1/logs"
+            traces:
+              endpoint: "{{ $state.observe.alloyReceiverEndpoint }}/v1/traces"
+        serviceMonitor:
+          # Falcosidekick chart uses `enabled`, NOT `create` (different from
+          # the falco chart). Both flow from spec.observe.enabled.
+          enabled: true
+        {{- end }}
       serviceMonitor:
-        # Off until ObserveStack integration lands.
-        enabled: false
+        # Falco chart SM field is `create`, NOT `enabled` (chart-author choice).
+        # Scrapes the metrics endpoint configured above.
+        create: {{ $state.observe.enabled }}
       falco:
         json_output: true
         json_include_output_property: true

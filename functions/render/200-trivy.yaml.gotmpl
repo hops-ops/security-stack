@@ -51,9 +51,10 @@ spec:
         vulnerabilityScannerScanOnlyCurrentRevisions: true
         configAuditScannerScanOnlyCurrentRevisions: true
       serviceMonitor:
-        # Off until ObserveStack integration lands
-        # (tasks/security-stack-observe-integration).
-        enabled: false
+        # Gated on spec.observe.enabled (default true) — flips on when
+        # ObserveStack integration is wired. Prometheus on the platform uses
+        # an empty serviceMonitorSelector so no label requirement.
+        enabled: {{ $state.observe.enabled }}
       {{- if gt (len $tv.values) 0 }}
       {{- toYaml $tv.values | nindent 6 }}
       {{- end }}

@@ -90,6 +90,21 @@
 {{- $ksSCVolumeBindingMode := $ksSC.volumeBindingMode | default "WaitForFirstConsumer" }}
 
 # ==============================================================================
+# ObserveStack integration toggle
+# ==============================================================================
+# When enabled, the render templates flip per-component telemetry knobs on:
+#   - Trivy: serviceMonitor.enabled
+#   - Falco: serviceMonitor.enabled + falcosidekick + OTLP outputs to alloy
+#   - Kubescape: capabilities.prometheusExporter
+# Operator can still override individual toggles via per-component values.
+{{- $observe := $spec.observe | default dict }}
+{{- $observeEnabled := true }}
+{{- if hasKey $observe "enabled" }}
+  {{- $observeEnabled = $observe.enabled }}
+{{- end }}
+{{- $alloyReceiverEndpoint := $observe.alloyReceiverEndpoint | default "http://alloy-receiver.monitoring.svc.cluster.local:4318" }}
+
+# ==============================================================================
 # Initialize $state
 # ==============================================================================
 {{- $state := dict
@@ -131,6 +146,10 @@
       "reclaimPolicy" $ksSCReclaimPolicy
       "volumeBindingMode" $ksSCVolumeBindingMode
     )
+  )
+  "observe" (dict
+    "enabled" $observeEnabled
+    "alloyReceiverEndpoint" $alloyReceiverEndpoint
   )
   "observed" (dict)
   "status" (dict)

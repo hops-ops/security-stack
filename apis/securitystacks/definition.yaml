@@ -167,6 +167,17 @@ spec:
                         description: Defaults to "WaitForFirstConsumer".
                         type: string
                         enum: [Immediate, WaitForFirstConsumer]
+              observe:
+                description: 'ObserveStack integration toggle. When enabled (default): Trivy + Falco + Kubescape ServiceMonitors are turned on for Prometheus scraping; Falcosidekick is enabled with OTLP outputs pointing at the Alloy receiver (Falco events → Loki for logs, Tempo for syscall traces); Kubescape prometheusExporter capability is flipped to enable. Operator can still override individual toggles via per-component values: blocks.'
+                type: object
+                properties:
+                  enabled:
+                    description: Whether to wire ObserveStack integration. Defaults to true.
+                    type: boolean
+                    default: true
+                  alloyReceiverEndpoint:
+                    description: OTLP HTTP endpoint of the ObserveStack Alloy receiver. Defaults to "http://alloy-receiver.monitoring.svc.cluster.local:4318" (the conventional Hops ObserveStack location). Override for non-standard observe-stack namespace or remote-collector setups.
+                    type: string
             required:
             - clusterName
           status:

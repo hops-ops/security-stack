@@ -339,7 +339,7 @@ _items = [
                         manageWorkloads = "disable"
                         syncSBOM = "disable"
                         riskAcceptance = "disable"
-                        prometheusExporter = "disable"
+                        prometheusExporter = "enable"  # flipped by spec.observe.enabled (default true)
                     }
                 }
             ]
@@ -485,6 +485,134 @@ _items = [
                     spec.providerConfigRef = {
                         name = "prod-cluster"
                         kind = "ProviderConfig"
+                    }
+                }
+            ]
+        }
+    }
+
+    # ==========================================================================
+    # Test 13: spec.observe.enabled defaults true — Trivy + Falco + Kubescape
+    #          ServiceMonitors enabled, Falcosidekick on with OTLP to alloy,
+    #          Kubescape prometheusExporter flipped to enable.
+    # ==========================================================================
+    metav1alpha1.CompositionTest {
+        metadata.name = "observe-default-enables-telemetry"
+        spec = {
+            compositionPath = "apis/securitystacks/composition.yaml"
+            xrdPath = "apis/securitystacks/definition.yaml"
+            timeoutSeconds = 60
+            validate = False
+            xr = stacksv1alpha1.SecurityStack {
+                metadata.name = "obs-default"
+                spec.clusterName = "my-cluster"
+            }
+            assertResources = [
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "trivy-operator"
+                    spec.forProvider.values.serviceMonitor.enabled = True
+                }
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "falco"
+                    spec.forProvider.values = {
+                        metrics.enabled = True
+                        serviceMonitor.create = True
+                        falcosidekick = {
+                            enabled = True
+                            serviceMonitor.enabled = True
+                            config.otlp = {
+                                logs.endpoint = "http://alloy-receiver.monitoring.svc.cluster.local:4318/v1/logs"
+                                traces.endpoint = "http://alloy-receiver.monitoring.svc.cluster.local:4318/v1/traces"
+                            }
+                        }
+                    }
+                }
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "kubescape"
+                    spec.forProvider.values = {
+                        capabilities.prometheusExporter = "enable"
+                        kubescape.serviceMonitor.enabled = True
+                    }
+                }
+            ]
+        }
+    }
+
+    # ==========================================================================
+    # Test 14: spec.observe.enabled=false — all telemetry off; falcosidekick
+    #          disabled; Kubescape prometheusExporter back to disable.
+    # ==========================================================================
+    metav1alpha1.CompositionTest {
+        metadata.name = "observe-disabled-turns-off-telemetry"
+        spec = {
+            compositionPath = "apis/securitystacks/composition.yaml"
+            xrdPath = "apis/securitystacks/definition.yaml"
+            timeoutSeconds = 60
+            validate = False
+            xr = stacksv1alpha1.SecurityStack {
+                metadata.name = "obs-off"
+                spec = {
+                    clusterName = "my-cluster"
+                    observe.enabled = False
+                }
+            }
+            assertResources = [
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "trivy-operator"
+                    spec.forProvider.values.serviceMonitor.enabled = False
+                }
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "falco"
+                    spec.forProvider.values = {
+                        serviceMonitor.create = False
+                        falcosidekick.enabled = False
+                    }
+                }
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "kubescape"
+                    spec.forProvider.values.capabilities.prometheusExporter = "disable"
+                }
+            ]
+        }
+    }
+
+    # ==========================================================================
+    # Test 15: alloyReceiverEndpoint override flows into Falcosidekick OTLP.
+    # ==========================================================================
+    metav1alpha1.CompositionTest {
+        metadata.name = "observe-alloy-endpoint-override"
+        spec = {
+            compositionPath = "apis/securitystacks/composition.yaml"
+            xrdPath = "apis/securitystacks/definition.yaml"
+            timeoutSeconds = 60
+            validate = False
+            xr = stacksv1alpha1.SecurityStack {
+                metadata.name = "obs-custom"
+                spec = {
+                    clusterName = "my-cluster"
+                    observe.alloyReceiverEndpoint = "http://otel-collector.observe.svc:4318"
+                }
+            }
+            assertResources = [
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "falco"
+                    spec.forProvider.values.falcosidekick.config.otlp = {
+                        logs.endpoint = "http://otel-collector.observe.svc:4318/v1/logs"
+                        traces.endpoint = "http://otel-collector.observe.svc:4318/v1/traces"
                     }
                 }
             ]

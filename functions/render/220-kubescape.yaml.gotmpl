@@ -90,8 +90,20 @@ spec:
         manageWorkloads: disable
         syncSBOM: disable
         riskAcceptance: disable
-        # Telemetry hooks — wired by future observe integration
-        prometheusExporter: disable
+        # Telemetry hooks — flipped on by spec.observe.enabled (default true).
+        # When enabled, Kubescape stands up a prometheus-exporter Deployment
+        # exposing /metrics for Prometheus scraping (posture scores per
+        # framework, control pass/fail counts). The ServiceMonitor template is
+        # gated on BOTH this capability AND kubescape.serviceMonitor.enabled
+        # (set below).
+        prometheusExporter: {{ if $state.observe.enabled }}enable{{ else }}disable{{ end }}
+      {{- if $state.observe.enabled }}
+      kubescape:
+        # Gates the prometheus-exporter ServiceMonitor template (chart logic
+        # requires BOTH this AND capabilities.prometheusExporter=enable).
+        serviceMonitor:
+          enabled: true
+      {{- end }}
       {{- if gt (len $ks.values) 0 }}
       {{- toYaml $ks.values | nindent 6 }}
       {{- end }}
