@@ -347,7 +347,124 @@ _items = [
     }
 
     # ==========================================================================
-    # Test 6: helmProviderConfigRef defaults to clusterName.
+    # Test 9: kubescape StorageClass composed by default, with EKS defaults
+    #         and persistence.storageClass auto-injected into helm values.
+    # ==========================================================================
+    metav1alpha1.CompositionTest {
+        metadata.name = "kubescape-storage-class-default"
+        spec = {
+            compositionPath = "apis/securitystacks/composition.yaml"
+            xrdPath = "apis/securitystacks/definition.yaml"
+            timeoutSeconds = 60
+            validate = False
+            xr = stacksv1alpha1.SecurityStack {
+                metadata.name = "sc-test"
+                spec.clusterName = "my-cluster"
+            }
+            assertResources = [
+                {
+                    apiVersion = "kubernetes.m.crossplane.io/v1alpha1"
+                    kind = "Object"
+                    metadata.name = "sc-test-kubescape-sc"
+                    spec.forProvider.manifest = {
+                        apiVersion = "storage.k8s.io/v1"
+                        kind = "StorageClass"
+                        metadata.name = "kubescape"
+                        provisioner = "ebs.csi.eks.amazonaws.com"
+                        reclaimPolicy = "Delete"
+                        volumeBindingMode = "WaitForFirstConsumer"
+                        parameters = {type = "gp3"}
+                    }
+                }
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "kubescape"
+                    spec.forProvider.values.persistence.storageClass = "kubescape"
+                }
+            ]
+        }
+    }
+
+    # ==========================================================================
+    # Test 10: kubescape StorageClass overrides — name, provisioner, params.
+    # ==========================================================================
+    metav1alpha1.CompositionTest {
+        metadata.name = "kubescape-storage-class-overrides"
+        spec = {
+            compositionPath = "apis/securitystacks/composition.yaml"
+            xrdPath = "apis/securitystacks/definition.yaml"
+            timeoutSeconds = 60
+            validate = False
+            xr = stacksv1alpha1.SecurityStack {
+                metadata.name = "sc-override"
+                spec = {
+                    clusterName = "gke-cluster"
+                    kubescape.storageClass = {
+                        name = "kubescape-fast"
+                        provisioner = "pd.csi.storage.gke.io"
+                        parameters = {type = "pd-ssd"}
+                        reclaimPolicy = "Retain"
+                    }
+                }
+            }
+            assertResources = [
+                {
+                    apiVersion = "kubernetes.m.crossplane.io/v1alpha1"
+                    kind = "Object"
+                    metadata.name = "sc-override-kubescape-fast-sc"
+                    spec.forProvider.manifest = {
+                        apiVersion = "storage.k8s.io/v1"
+                        kind = "StorageClass"
+                        metadata.name = "kubescape-fast"
+                        provisioner = "pd.csi.storage.gke.io"
+                        reclaimPolicy = "Retain"
+                        parameters = {type = "pd-ssd"}
+                    }
+                }
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "kubescape"
+                    spec.forProvider.values.persistence.storageClass = "kubescape-fast"
+                }
+            ]
+        }
+    }
+
+    # ==========================================================================
+    # Test 11: kubescape.storageClass.enabled=false skips SC rendering and
+    #          does NOT inject persistence.storageClass into helm values.
+    # ==========================================================================
+    metav1alpha1.CompositionTest {
+        metadata.name = "kubescape-storage-class-disabled"
+        spec = {
+            compositionPath = "apis/securitystacks/composition.yaml"
+            xrdPath = "apis/securitystacks/definition.yaml"
+            timeoutSeconds = 60
+            validate = False
+            xr = stacksv1alpha1.SecurityStack {
+                metadata.name = "no-sc"
+                spec = {
+                    clusterName = "my-cluster"
+                    kubescape.storageClass = {enabled = False}
+                }
+            }
+            # We assert the Release exists (kubescape helm still installs) —
+            # absence of the SC Object MR and absence of the auto-injected
+            # persistence.storageClass would be observed via render output.
+            assertResources = [
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "kubescape"
+                }
+            ]
+        }
+    }
+
+    # ==========================================================================
+    # Test 12: helmProviderConfigRef defaults to clusterName.
     # ==========================================================================
     metav1alpha1.CompositionTest {
         metadata.name = "helm-provider-config-defaults-to-cluster-name"

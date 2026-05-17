@@ -117,7 +117,7 @@ spec:
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
               kubescape:
-                description: 'Kubescape (CNCF Incubating) configuration — posture + framework reports (NSA, MITRE ATT&CK, CIS) + DaemonSet-based per-node CIS via host-scanner (works on EKS Auto Mode where Trivy node-collector cannot). Capabilities are pre-tuned to complement (not duplicate) Trivy + Falco + Kyverno: vulnerabilityScan/runtimeDetection/admissionController disabled; configurationScan + continuousScan + nodeScan enabled.'
+                description: 'Kubescape (CNCF Incubating) configuration — posture + framework reports (NSA, MITRE ATT&CK, CIS) at workload + cluster level. In our minimal capability config the node-agent DaemonSet does NOT deploy (gated on runtime-detection capabilities owned by Falco) — Kubescape contributes framework-mapped posture, not per-node CIS. Capabilities are pre-tuned to complement (not duplicate) Trivy + Falco + Kyverno: vulnerabilityScan/runtimeDetection/admissionController disabled; configurationScan + continuousScan + nodeScan enabled.'
                 type: object
                 properties:
                   enabled:
@@ -141,6 +141,32 @@ spec:
                     description: Helm values that replace all defaults entirely.
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
+                  storageClass:
+                    description: 'StorageClass composed by the stack for the Kubescape storage component PVC (`kubescape-storage`, 5Gi by default). Removes the dependency on the cluster having a default StorageClass for the right CSI driver. Mirrors the knative-stack nats.storageClass pattern. When enabled, persistence.storageClass in the helm values defaults to this SC name (still overridable via spec.kubescape.values).'
+                    type: object
+                    properties:
+                      enabled:
+                        description: Whether to compose the StorageClass. Defaults to true when kubescape.enabled.
+                        type: boolean
+                      name:
+                        description: StorageClass name. Defaults to "kubescape".
+                        type: string
+                      provisioner:
+                        description: CSI provisioner. Defaults to "ebs.csi.eks.amazonaws.com" (EKS managed CSI driver). Override for non-EKS clusters (`pd.csi.storage.gke.io`, `disk.csi.azure.com`, `rancher.io/local-path`, etc.).
+                        type: string
+                      parameters:
+                        description: 'CSI provisioner parameters. Defaults to {type: gp3} (EKS gp3 EBS volumes).'
+                        type: object
+                        additionalProperties:
+                          type: string
+                      reclaimPolicy:
+                        description: Defaults to "Delete".
+                        type: string
+                        enum: [Delete, Retain]
+                      volumeBindingMode:
+                        description: Defaults to "WaitForFirstConsumer".
+                        type: string
+                        enum: [Immediate, WaitForFirstConsumer]
             required:
             - clusterName
           status:

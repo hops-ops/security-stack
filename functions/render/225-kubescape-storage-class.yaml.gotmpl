@@ -1,0 +1,43 @@
+# code: language=yaml
+#
+# StorageClass for the Kubescape storage component PVC (cluster-scoped Object).
+#
+# Removes the dependency on the cluster having a default StorageClass for the
+# right CSI driver. The Kubescape Helm values' persistence.storageClass
+# defaults to this SC's name (see 220-kubescape.yaml.gotmpl).
+#
+# Mirrors the knative-stack nats.storageClass pattern.
+#
+
+{{- $ks := $state.kubescape }}
+{{- $sc := $ks.storageClass }}
+{{- $k8sPCR := $state.kubernetesProviderConfigRef }}
+
+{{- if and $ks.enabled $sc.enabled }}
+---
+apiVersion: kubernetes.m.crossplane.io/v1alpha1
+kind: Object
+metadata:
+  name: {{ $state.name }}-{{ $sc.name }}-sc
+  annotations:
+    {{ setResourceNameAnnotation "kubescape-storage-class" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  forProvider:
+    manifest:
+      apiVersion: storage.k8s.io/v1
+      kind: StorageClass
+      metadata:
+        name: {{ $sc.name }}
+        labels: {{ $state.labels | toJson }}
+      provisioner: {{ $sc.provisioner }}
+      reclaimPolicy: {{ $sc.reclaimPolicy }}
+      volumeBindingMode: {{ $sc.volumeBindingMode }}
+      {{- if $sc.parameters }}
+      parameters: {{ toJson $sc.parameters }}
+      {{- end }}
+  providerConfigRef:
+    name: {{ $k8sPCR.name }}
+    kind: {{ $k8sPCR.kind }}
+{{- end }}
