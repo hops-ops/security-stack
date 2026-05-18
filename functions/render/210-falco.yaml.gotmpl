@@ -95,6 +95,14 @@ spec:
         # full Alloy receiver pipeline config (otelcol.receiver.otlp →
         # batch processor → loki.write / otelcol.exporter.otlp.tempo).
         enabled: {{ $state.observe.enabled }}
+        # Burstable: stateless event forwarder, restart-cheap.
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
         {{- if $state.observe.enabled }}
         config:
           # Direct Loki output — Falcosidekick 2.31 does NOT expose an OTLP
@@ -120,6 +128,16 @@ spec:
         json_include_output_property: true
         # Buffer pressure (scap_n_drops_total) is the key SLI per research;
         # increase ring_buffer_size if drops appear under load.
+      # k8s-metacollector subchart — enriches Falco events with k8s metadata.
+      # Burstable: stateless metadata cache, scales with cluster object count.
+      k8s-metacollector:
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 100m
+            memory: 256Mi
       {{- if gt (len $fl.values) 0 }}
       {{- toYaml $fl.values | nindent 6 }}
       {{- end }}
