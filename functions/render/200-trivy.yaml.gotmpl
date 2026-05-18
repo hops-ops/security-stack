@@ -50,15 +50,6 @@ spec:
         # signal cadence once ObserveStack alerts are wired.
         vulnerabilityScannerScanOnlyCurrentRevisions: true
         configAuditScannerScanOnlyCurrentRevisions: true
-        # Burstable: P95 ~440Mi on a Crossplane-heavy cluster (many CRs to scan
-        # configs against). Memory request==limit caps blast radius; no CPU
-        # limit so scan-coordination CPU spikes don't get throttled.
-        resources:
-          requests:
-            cpu: 100m
-            memory: 512Mi
-          limits:
-            memory: 512Mi
       serviceMonitor:
         # Gated on spec.observe.enabled (default true) — flips on when
         # ObserveStack integration is wired. Prometheus on the platform uses
