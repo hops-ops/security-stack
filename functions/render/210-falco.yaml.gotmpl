@@ -10,9 +10,11 @@
 #     deprecated. XRD enum forbids 'ebpf'.
 #   - falcosidekick: disabled. Output routing (Loki / OTel) is its own
 #     iteration (tasks/security-stack-otel-collector-output).
-#   - resources: 256m / 512Mi request, 1Gi memory limit. Research surfaced
-#     >8GB on busy GKE nodes — sized for the colima/pat-local baseline; raise
-#     via spec.falco.values.resources for large clusters.
+#   - resources: 100m / 512Mi request, 2Gi memory limit. 1Gi default OOMKilled
+#     repeatedly under modest load on pat-local; 2Gi gives headroom for the
+#     userspace rule engine + Lua plugin scratch. Research surfaced >8GB on
+#     busy GKE nodes — raise further via spec.falco.values.resources for
+#     large clusters.
 #   - tolerations: ambient-style wildcard NoSchedule/NoExecute, matching the
 #     ztunnel/istio-cni precedent in the cluster (see
 #     reference_istio_ambient_daemonset_tolerations memory).
@@ -62,7 +64,7 @@ spec:
           memory: 512Mi
         limits:
           cpu: 1000m
-          memory: 1Gi
+          memory: 2Gi
       # Run on every node, mirroring the ambient DaemonSet (ztunnel / istio-cni)
       # tolerations pattern. Don't miss events on tainted node pools.
       tolerations:
