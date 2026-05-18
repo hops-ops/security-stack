@@ -39,6 +39,16 @@ spec:
       {{- toYaml $tv.overrideAllValues | nindent 6 }}
     {{- else }}
     values:
+      # Burstable: operator caches scan reports + workload metadata. P95 ~440Mi
+      # on a Crossplane-heavy cluster (many CRs to scan configs against).
+      # NB: chart 0.30.0 reads top-level `resources:` for the operator
+      # Deployment, NOT `operator.resources` (which is ignored).
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+        limits:
+          memory: 512Mi
       trivy:
         # Scan targets — image vulns + workload config + RBAC posture + secrets.
         # Cluster-compliance (CIS / NSA) is left off here; Kubescape covers that
