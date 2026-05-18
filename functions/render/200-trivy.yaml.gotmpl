@@ -39,21 +39,32 @@ spec:
       {{- toYaml $tv.overrideAllValues | nindent 6 }}
     {{- else }}
     values:
-      # Burstable: operator caches scan reports + workload metadata. P95 ~440Mi
-      # on a Crossplane-heavy cluster (many CRs to scan configs against).
-      # NB: chart 0.30.0 reads top-level `resources:` for the operator
-      # Deployment, NOT `operator.resources` (which is ignored).
+      # Burstable: operator caches scan reports + workload metadata. P95
+      # observed at 638Mi on pat-local under scan churn; sized to 1Gi for
+      # headroom. NB: chart 0.30.0 reads top-level `resources:` for the
+      # operator Deployment, NOT `operator.resources` (which is ignored).
       resources:
         requests:
           cpu: 100m
-          memory: 512Mi
+          memory: 1Gi
         limits:
-          memory: 512Mi
+          memory: 1Gi
       trivy:
         # Scan targets — image vulns + workload config + RBAC posture + secrets.
         # Cluster-compliance (CIS / NSA) is left off here; Kubescape covers that
         # surface and is tracked at tasks/security-stack-kubescape-promote-v1.
         ignoreUnfixed: false
+        # Scanner container resources — chart default 100m/100M req,
+        # 500m/500M limit OOMKills on real-world images (anything larger
+        # than ~300MB unpacked exceeds the buffer). Bump to 1Gi to handle
+        # typical platform images (provider-aws, alloy, prometheus, etc.).
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
       operator:
         scanJobsConcurrentLimit: 10
         # Default 24h interval is fine for first pass; tune downward for higher
