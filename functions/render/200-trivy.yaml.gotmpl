@@ -45,10 +45,16 @@ spec:
       # operator Deployment, NOT `operator.resources` (which is ignored).
       resources:
         requests:
-          cpu: 100m
-          memory: 1Gi
+          cpu: 50m
+          memory: 826Mi
         limits:
           memory: 1Gi
+      {{- if $state.nodePool.enabled }}
+      nodeSelector:
+        {{- toYaml $state.nodePool.nodeSelector | nindent 8 }}
+      tolerations:
+        {{- toYaml $state.nodePool.tolerations | nindent 8 }}
+      {{- end }}
       trivy:
         # Scan targets — image vulns + workload config + RBAC posture + secrets.
         # Cluster-compliance (CIS / NSA) is left off here; Kubescape covers that
@@ -71,6 +77,22 @@ spec:
         # signal cadence once ObserveStack alerts are wired.
         vulnerabilityScannerScanOnlyCurrentRevisions: true
         configAuditScannerScanOnlyCurrentRevisions: true
+        {{- if $state.nodePool.enabled }}
+        scanJobNodeSelector:
+          {{- toYaml $state.nodePool.nodeSelector | nindent 10 }}
+        scanJobTolerations:
+          {{- toYaml $state.nodePool.tolerations | nindent 10 }}
+        {{- end }}
+      {{- if $state.nodePool.enabled }}
+      nodeCollector:
+        # Node collector is per-node; tolerate all taints so node scans are not
+        # silently skipped on dedicated pools.
+        tolerations:
+          - effect: NoSchedule
+            operator: Exists
+          - effect: NoExecute
+            operator: Exists
+      {{- end }}
       serviceMonitor:
         # Gated on spec.observe.enabled (default true) — flips on when
         # ObserveStack integration is wired. Prometheus on the platform uses

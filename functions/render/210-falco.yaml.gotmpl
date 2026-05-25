@@ -60,11 +60,29 @@ spec:
       tty: false
       resources:
         requests:
-          cpu: 100m
-          memory: 512Mi
+          cpu: 50m
+          memory: 826Mi
         limits:
           cpu: 1000m
           memory: 2Gi
+      falcoctl:
+        artifact:
+          install:
+            resources:
+              requests:
+                cpu: 10m
+                memory: 50Mi
+              limits:
+                cpu: 100m
+                memory: 128Mi
+          follow:
+            resources:
+              requests:
+                cpu: 11m
+                memory: 50Mi
+              limits:
+                cpu: 100m
+                memory: 128Mi
       # Run on every node, mirroring the ambient DaemonSet (ztunnel / istio-cni)
       # tolerations pattern. Don't miss events on tainted node pools.
       tolerations:
@@ -98,11 +116,17 @@ spec:
         # Burstable: stateless event forwarder, restart-cheap.
         resources:
           requests:
-            cpu: 50m
-            memory: 64Mi
+            cpu: 15m
+            memory: 100Mi
           limits:
             cpu: 100m
-            memory: 128Mi
+            memory: 256Mi
+        {{- if $state.nodePool.enabled }}
+        nodeSelector:
+          {{- toYaml $state.nodePool.nodeSelector | nindent 10 }}
+        tolerations:
+          {{- toYaml $state.nodePool.tolerations | nindent 10 }}
+        {{- end }}
         {{- if $state.observe.enabled }}
         config:
           # Direct Loki output — Falcosidekick 2.31 does NOT expose an OTLP
@@ -133,11 +157,17 @@ spec:
       k8s-metacollector:
         resources:
           requests:
-            cpu: 50m
-            memory: 128Mi
+            cpu: 15m
+            memory: 100Mi
           limits:
             cpu: 100m
             memory: 256Mi
+        {{- if $state.nodePool.enabled }}
+        nodeSelector:
+          {{- toYaml $state.nodePool.nodeSelector | nindent 10 }}
+        tolerations:
+          {{- toYaml $state.nodePool.tolerations | nindent 10 }}
+        {{- end }}
       {{- if gt (len $fl.values) 0 }}
       {{- toYaml $fl.values | nindent 6 }}
       {{- end }}

@@ -727,6 +727,106 @@ _items = [
             ]
         }
     }
+
+    # ==========================================================================
+    # Test 16: nodePool adds placement while DaemonSets keep broad tolerations.
+    # ==========================================================================
+    metav1alpha1.CompositionTest {
+        metadata.name = "nodepool-adds-security-placement-and-resources"
+        spec = {
+            compositionPath = "apis/securitystacks/composition.yaml"
+            xrdPath = "apis/securitystacks/definition.yaml"
+            timeoutSeconds = 60
+            validate = False
+            xr = stacksv1alpha1.SecurityStack {
+                metadata.name = "security-nodepool"
+                spec = {
+                    clusterName = "my-cluster"
+                    nodePool.enabled = True
+                }
+            }
+            assertResources = [
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "trivy-operator"
+                    spec.forProvider.values = {
+                        nodeSelector = {"workload-type" = "security"}
+                        tolerations = [
+                            {
+                                key = "security"
+                                operator = "Equal"
+                                value = "true"
+                                effect = "NoSchedule"
+                            }
+                        ]
+                        resources.requests = {
+                            cpu = "50m"
+                            memory = "826Mi"
+                        }
+                        nodeCollector.tolerations = [
+                            {operator = "Exists", effect = "NoSchedule"}
+                            {operator = "Exists", effect = "NoExecute"}
+                        ]
+                    }
+                }
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "falco"
+                    spec.forProvider.values = {
+                        tolerations = [
+                            {operator = "Exists", effect = "NoSchedule"}
+                            {operator = "Exists", effect = "NoExecute"}
+                        ]
+                        resources.requests = {
+                            cpu = "50m"
+                            memory = "826Mi"
+                        }
+                        falcoctl.artifact.follow.resources.requests = {
+                            cpu = "11m"
+                            memory = "50Mi"
+                        }
+                        falcosidekick.nodeSelector = {"workload-type" = "security"}
+                        falcosidekick.tolerations = [
+                            {
+                                key = "security"
+                                operator = "Equal"
+                                value = "true"
+                                effect = "NoSchedule"
+                            }
+                        ]
+                    }
+                }
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "kubescape"
+                    spec.forProvider.values.kubescape = {
+                        nodeSelector = {
+                            "kubernetes.io/os" = "linux"
+                            "workload-type" = "security"
+                        }
+                        resources.requests = {
+                            cpu = "716m"
+                            memory = "454Mi"
+                        }
+                    }
+                }
+                {
+                    apiVersion = "kubernetes.m.crossplane.io/v1alpha1"
+                    kind = "Object"
+                    metadata.name = "security-nodepool-nodepool-security"
+                    spec.forProvider.manifest = {
+                        apiVersion = "karpenter.sh/v1"
+                        kind = "NodePool"
+                        metadata.name = "hops-security"
+                        spec.template.metadata.labels = {"workload-type" = "security"}
+                    }
+                }
+            ]
+        }
+    }
 ]
 
 items = _items
