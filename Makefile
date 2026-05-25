@@ -25,6 +25,7 @@ generate-configuration:
 # Format: example_path::observed_resources_path (observed_resources_path optional).
 EXAMPLES := \
     examples/securitystacks/minimal.yaml:: \
+    examples/securitystacks/nodepool.yaml:: \
     examples/securitystacks/standard.yaml::
 
 render\:all:

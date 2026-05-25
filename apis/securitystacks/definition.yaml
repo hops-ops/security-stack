@@ -59,6 +59,34 @@ spec:
                     enum:
                     - ProviderConfig
                     - ClusterProviderConfig
+              nodePool:
+                description: Optional dedicated Karpenter NodePool for security workloads. When enabled, non-DaemonSet pods are scheduled with workload-type=security and tolerate security=true:NoSchedule; DaemonSets only receive tolerations.
+                type: object
+                properties:
+                  enabled:
+                    description: Whether to create a dedicated NodePool. Defaults to false.
+                    type: boolean
+                    default: false
+                  name:
+                    description: NodePool name on the target cluster. Defaults to "hops-security".
+                    type: string
+                  nodeClassName:
+                    description: EKS Auto Mode NodeClass to reference. Defaults to "hops-default".
+                    type: string
+                  limits:
+                    description: Karpenter NodePool resource limits. Defaults to nodes=10.
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                  requirements:
+                    description: Karpenter scheduling requirements. Defaults to amd64/linux spot or on-demand nodes.
+                    type: array
+                    items:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                  disruption:
+                    description: Karpenter disruption settings. Defaults to WhenEmptyOrUnderutilized after 60s.
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
               trivy:
                 description: Trivy Operator configuration.
                 type: object

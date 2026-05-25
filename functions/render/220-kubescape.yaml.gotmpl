@@ -30,6 +30,7 @@
 
 {{- $ks := $state.kubescape }}
 {{- if $ks.enabled }}
+{{- $securityNodeSelector := mergeOverwrite (dict "kubernetes.io/os" "linux") $state.nodePool.nodeSelector }}
 ---
 apiVersion: helm.m.crossplane.io/v1beta1
 kind: Release
@@ -97,13 +98,106 @@ spec:
         # gated on BOTH this capability AND kubescape.serviceMonitor.enabled
         # (set below).
         prometheusExporter: {{ if $state.observe.enabled }}enable{{ else }}disable{{ end }}
-      {{- if $state.observe.enabled }}
+      {{- if $state.nodePool.enabled }}
+      customScheduling:
+        tolerations:
+          {{- toYaml $state.nodePool.tolerations | nindent 10 }}
+      {{- end }}
       kubescape:
+        resources:
+          requests:
+            cpu: 716m
+            memory: 454Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        {{- if $state.nodePool.enabled }}
+        nodeSelector:
+          {{- toYaml $securityNodeSelector | nindent 10 }}
+        tolerations:
+          {{- toYaml $state.nodePool.tolerations | nindent 10 }}
+        {{- end }}
+      {{- if $state.observe.enabled }}
         # Gates the prometheus-exporter ServiceMonitor template (chart logic
         # requires BOTH this AND capabilities.prometheusExporter=enable).
         serviceMonitor:
           enabled: true
       {{- end }}
+      operator:
+        resources:
+          requests:
+            cpu: 15m
+            memory: 100Mi
+          limits:
+            cpu: 300m
+            memory: 512Mi
+        {{- if $state.nodePool.enabled }}
+        nodeSelector:
+          {{- toYaml $securityNodeSelector | nindent 10 }}
+        tolerations:
+          {{- toYaml $state.nodePool.tolerations | nindent 10 }}
+        admissionWebhooks:
+          patch:
+            nodeSelector:
+              {{- toYaml $securityNodeSelector | nindent 14 }}
+            tolerations:
+              {{- toYaml $state.nodePool.tolerations | nindent 14 }}
+        {{- end }}
+      storage:
+        resources:
+          requests:
+            cpu: 296m
+            memory: 156Mi
+          limits:
+            cpu: 1000m
+            memory: 4735Mi
+        {{- if $state.nodePool.enabled }}
+        nodeSelector:
+          {{- toYaml $securityNodeSelector | nindent 10 }}
+        tolerations:
+          {{- toYaml $state.nodePool.tolerations | nindent 10 }}
+        mtls:
+          certgen:
+            nodeSelector:
+              {{- toYaml $securityNodeSelector | nindent 14 }}
+            tolerations:
+              {{- toYaml $state.nodePool.tolerations | nindent 14 }}
+        {{- end }}
+      synchronizer:
+        resources:
+          requests:
+            cpu: 15m
+            memory: 100Mi
+          limits:
+            cpu: 200m
+            memory: 500Mi
+        {{- if $state.nodePool.enabled }}
+        nodeSelector:
+          {{- toYaml $securityNodeSelector | nindent 10 }}
+        tolerations:
+          {{- toYaml $state.nodePool.tolerations | nindent 10 }}
+        {{- end }}
+      prometheusExporter:
+        resources:
+          requests:
+            cpu: 15m
+            memory: 100Mi
+          limits:
+            cpu: 100m
+            memory: 256Mi
+        {{- if $state.nodePool.enabled }}
+        nodeSelector:
+          {{- toYaml $securityNodeSelector | nindent 10 }}
+        tolerations:
+          {{- toYaml $state.nodePool.tolerations | nindent 10 }}
+        {{- end }}
+      nodeAgent:
+        # DaemonSet: no workload-type nodeSelector, tolerate all taints.
+        tolerations:
+          - effect: NoSchedule
+            operator: Exists
+          - effect: NoExecute
+            operator: Exists
       {{- if gt (len $ks.values) 0 }}
       {{- toYaml $ks.values | nindent 6 }}
       {{- end }}
