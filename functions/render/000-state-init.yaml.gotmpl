@@ -78,6 +78,7 @@
 {{- end }}
 {{- $tvNamespace := $tv.namespace | default "trivy-system" }}
 {{- $tvReleaseName := $tv.releaseName | default "trivy-operator" }}
+# renovate: datasource=helm depName=trivy-operator registryUrl=https://aquasecurity.github.io/helm-charts/
 {{- $tvChartVersion := $tv.chartVersion | default "0.30.0" }}
 
 # ==============================================================================
@@ -90,6 +91,7 @@
 {{- end }}
 {{- $flNamespace := $fl.namespace | default "falco" }}
 {{- $flReleaseName := $fl.releaseName | default "falco" }}
+# renovate: datasource=helm depName=falco registryUrl=https://falcosecurity.github.io/charts
 {{- $flChartVersion := $fl.chartVersion | default "6.2.0" }}
 {{- $flDriver := $fl.driver | default "modern_ebpf" }}
 
@@ -103,6 +105,7 @@
 {{- end }}
 {{- $ksNamespace := $ks.namespace | default "kubescape" }}
 {{- $ksReleaseName := $ks.releaseName | default "kubescape" }}
+# renovate: datasource=helm depName=kubescape-operator registryUrl=https://kubescape.github.io/helm-charts/
 {{- $ksChartVersion := $ks.chartVersion | default "1.40.1" }}
 
 # Kubescape StorageClass (composed when kubescape.storageClass.enabled)

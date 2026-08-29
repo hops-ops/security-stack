@@ -34,6 +34,7 @@ _items = [
                         chart = {
                             name = "trivy-operator"
                             repository = "https://aquasecurity.github.io/helm-charts/"
+                            # renovate: datasource=helm depName=trivy-operator registryUrl=https://aquasecurity.github.io/helm-charts/
                             version = "0.30.0"
                         }
                         namespace = "trivy-system"
@@ -47,6 +48,7 @@ _items = [
                         chart = {
                             name = "falco"
                             repository = "https://falcosecurity.github.io/charts"
+                            # renovate: datasource=helm depName=falco registryUrl=https://falcosecurity.github.io/charts
                             version = "6.2.0"
                         }
                         namespace = "falco"
@@ -60,6 +62,7 @@ _items = [
                         chart = {
                             name = "kubescape-operator"
                             repository = "https://kubescape.github.io/helm-charts/"
+                            # renovate: datasource=helm depName=kubescape-operator registryUrl=https://kubescape.github.io/helm-charts/
                             version = "1.40.1"
                         }
                         namespace = "kubescape"
