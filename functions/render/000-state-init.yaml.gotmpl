@@ -106,7 +106,7 @@
 {{- $ksNamespace := $ks.namespace | default "kubescape" }}
 {{- $ksReleaseName := $ks.releaseName | default "kubescape" }}
 # renovate: datasource=helm depName=kubescape-operator registryUrl=https://kubescape.github.io/helm-charts/
-{{- $ksChartVersion := $ks.chartVersion | default "1.40.1" }}
+{{- $ksChartVersion := $ks.chartVersion | default "1.40.4" }}
 
 # Kubescape StorageClass (composed when kubescape.storageClass.enabled)
 # Pattern mirrors knative-stack nats.storageClass — removes the dependency on
