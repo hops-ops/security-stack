@@ -63,7 +63,7 @@ _items = [
                             name = "kubescape-operator"
                             repository = "https://kubescape.github.io/helm-charts/"
                             # renovate: datasource=helm depName=kubescape-operator registryUrl=https://kubescape.github.io/helm-charts/
-                            version = "1.40.1"
+                            version = "1.40.4"
                         }
                         namespace = "kubescape"
                     }
