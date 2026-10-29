@@ -35,7 +35,7 @@ _items = [
                             name = "trivy-operator"
                             repository = "https://aquasecurity.github.io/helm-charts/"
                             # renovate: datasource=helm depName=trivy-operator registryUrl=https://aquasecurity.github.io/helm-charts/
-                            version = "0.37.0"
+                            version = "0.38.1"
                         }
                         namespace = "trivy-system"
                     }
