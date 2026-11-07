@@ -49,7 +49,7 @@ _items = [
                             name = "falco"
                             repository = "https://falcosecurity.github.io/charts"
                             # renovate: datasource=helm depName=falco registryUrl=https://falcosecurity.github.io/charts
-                            version = "9.2.1"
+                            version = "9.2.2"
                         }
                         namespace = "falco"
                     }
